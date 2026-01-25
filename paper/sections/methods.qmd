@@ -1,0 +1,147 @@
+# Data and Methods {#sec-methods}
+
+## Data Source {.unnumbered}
+
+We use data from the Berkeley Interpersonal Contact Study (BICS), a nationally representative survey that collected detailed information on social contact patterns, protective behaviors, and demographic characteristics during the COVID-19 pandemic in the United States. BICS recruited respondents from an online panel and used weighting methods to generate nationally representative estimates. Respondents were asked how many people they had face-to-face contact with on the day before the survey interview, and detailed information was collected on up to three of these contacts, including information about each contact's age, sex, race/ethnicity, mask usage, and physical distance. Additional details on the survey methodology, questionnaire design, sampling, and weighting are described in @feehan_quantifying_2021.
+
+## Sample Characteristics {.unnumbered}
+
+We analyze data from BICS waves 1 through 6, spanning April 2020 to May 2021. Wave 0 is omitted because it did not record political affiliation in a comparable way. Political party identification was assessed by the panel provider prior to the survey. Upon enrollment in the panel, all potential survey respondents were asked to select their partisan affiliation from standard categories (Democrat, Republican, Independent, or Prefer not to Say/Other). We exclude respondents in the "Prefer not to Say/Other" category to prevent potential misclassification bias.
+
+```{r}
+#| label: tbl-demographics
+#| tbl-cap: "Sample Characteristics by Political Party"
+#| echo: false
+#| message: false
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+# Load paper statistics
+stats_path <- here::here("out", "tables", "paper_statistics.rds")
+paper_stats <- readRDS(stats_path)
+invisible(list2env(paper_stats, envir = environment()))
+
+# Create demographics table
+demo_table <- tibble(
+  Characteristic = c(
+    "N",
+    "Mean age (years)",
+    "Male (%)",
+    "White (%)",
+    "College graduate (%)",
+    "Metropolitan (%)",
+    "Employed (%)",
+    "Household size"
+  ),
+  Republican = c(
+    format(n_rep, big.mark = ","),
+    sprintf("%.1f", age_rep),
+    sprintf("%.1f", male_rep),
+    sprintf("%.1f", white_rep),
+    sprintf("%.1f", college_rep),
+    sprintf("%.1f", metro_rep),
+    sprintf("%.1f", employed_rep),
+    sprintf("%.2f", hhsize_rep)
+  ),
+  Independent = c(
+    format(n_ind, big.mark = ","),
+    sprintf("%.1f", age_ind),
+    sprintf("%.1f", male_ind),
+    sprintf("%.1f", white_ind),
+    sprintf("%.1f", college_ind),
+    sprintf("%.1f", metro_ind),
+    sprintf("%.1f", employed_ind),
+    sprintf("%.2f", hhsize_ind)
+  ),
+  Democrat = c(
+    format(n_dem, big.mark = ","),
+    sprintf("%.1f", age_dem),
+    sprintf("%.1f", male_dem),
+    sprintf("%.1f", white_dem),
+    sprintf("%.1f", college_dem),
+    sprintf("%.1f", metro_dem),
+    sprintf("%.1f", employed_dem),
+    sprintf("%.2f", hhsize_dem)
+  )
+)
+
+kable(demo_table, align = c("l", "r", "r", "r")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = FALSE,
+                position = "center") %>%
+  row_spec(0, bold = TRUE)
+```
+
+The three partisan groups differed on several demographic characteristics (@tbl-demographics). Republicans were older on average and more likely to be male. The most striking demographic difference was in racial composition: 85% of Republicans identified as white, compared to 71% of Independents and 60% of Democrats. Democrats were more likely to live in metropolitan areas and to hold a college degree. These demographic differences are important to consider when interpreting partisan gaps in health behaviors, as some behavioral differences may be partially attributable to compositional differences between groups.
+
+As visible in the sample sizes, our analytic sample of 18,233 respondents overrepresents Democrats (44.9%) relative to national estimates of party identification during the study period---30% Democrat, 29% Republican, and 39% Independent [@gallup_party_2021]---while underrepresenting Independents (24.8% vs. 39%). Republicans are represented at roughly their national share (30.3% vs. 29%). Survey weights are applied throughout our analyses to improve representativeness. These weights adjust for age, gender, race/ethnicity, and education, and we additionally rake on party identification to match national targets. However, because partisanship is highly correlated with these demographic characteristics, the party-adjusted weights produce estimates that are nearly identical to the original demographic weights for within-party comparisons (see @sec-weight-sensitivity).
+
+## Measures {.unnumbered}
+
+### Health Behaviors
+
+**Social Contacts.**
+
+**Mask-Wearing.**
+
+**Vaccination.**
+
+### Political Affiliation
+
+We measure political affiliation using respondents' self-reported party identification. Respondents were classified as Democrats, Republicans, or Independents based on their responses.
+
+### Geographic Context
+
+We link individual survey responses to geographic data at the ZIP code and congressional district levels. This allows us to characterize the local partisan environment and policy context in which respondents were living.
+
+**Partisan Composition.**
+
+**Policy Environment.**
+
+### Control Variables
+
+We control for a range of demographic and socioeconomic characteristics that may confound the relationship between partisanship and health behaviors, including age, gender, race/ethnicity, education, income, and urban/rural residence.
+
+## Analytic Approach {.unnumbered}
+
+### Descriptive Analysis
+
+We first present descriptive statistics on partisan differences in health behaviors across survey waves. We use survey weights to generate nationally representative estimates.
+
+### Regression Models
+
+We estimate regression models to assess partisan differences in health behaviors while controlling for potential confounders.
+For continuous outcomes (e.g., number of contacts), we use linear regression.
+For binary outcomes (e.g., mask-wearing), we use logistic regression.
+
+To examine whether partisans differentially responded to changes in COVID-19 severity over time, we estimate models interacting political party with incidence rates:
+
+$$
+Y_{ict} = \beta_1 \text{Party}_i + \beta_2 \log(\text{Incidence}_{c,t-1}) + \beta_3 (\text{Party}_i \times \log(\text{Incidence}_{c,t-1})) + \gamma_c + \mathbf{X}_i'\delta + \epsilon_{ict}
+$$
+
+where $Y_{ict}$ is the outcome (daily contacts or mask usage) for individual $i$ in county $c$ at time $t$, $\text{Party}_i$ indicates partisan affiliation (with Democrats as the reference category), $\log(\text{Incidence}_{c,t-1})$ is the log-transformed COVID-19 incidence rate in county $c$ during the week *prior* to the survey, $\gamma_c$ represents county fixed effects, and $\mathbf{X}_i$ includes individual-level controls (interview day, urban/rural residence).
+We use lagged incidence (and mortality) rates to ensure proper temporal ordering: respondents observe pandemic conditions in their county, and then adjust their behavior in the following week.
+The coefficient $\beta_3$ captures differential partisan responsiveness to these observed conditions.
+
+To facilitate comparison between incidence and mortality effects, we standardize both predictors (z-score) before estimation.
+Coefficients thus represent the change in behavior associated with a one standard deviation increase in log incidence or log mortality.
+
+The county fixed effects are central to our identification strategy.
+By including county fixed effects, the model uses only within-county variation over time, answering the question: "within the same county, as incidence rises and falls, how do partisans adjust their behavior?"
+This approach controls for all time-invariant county characteristics---local political culture, healthcare infrastructure, population density, and baseline behavioral norms---that might otherwise confound the relationship between incidence and behavior.
+
+We intentionally omit wave fixed effects from these models.
+Including wave fixed effects would absorb the temporal variation in incidence rates that we aim to study.
+Following standard practice for modeling rates that span orders of magnitude, we log-transform incidence rates before analysis.
+Effect sizes are reported for a 10% increase in the log rate.
+
+### Geographic Heterogeneity
+
+We examine whether partisan differences vary across geographic contexts by estimating models with interactions between individual partisanship and local partisan composition.
+
+### Temporal Dynamics
+
+We assess how partisan differences evolved over time by estimating models separately for each survey wave and by examining interactions between partisanship and survey timing.

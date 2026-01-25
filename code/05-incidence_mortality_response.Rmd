@@ -1,0 +1,1345 @@
+---
+title: "05-incidence_mortality_response"
+author: "Christopher Soria"
+date: "2024-10-16"
+output: html_document
+---
+
+# =============================================================================
+# TABLE OF CONTENTS
+# -----------------------------------------------------------------------------
+# 1. SETUP AND CONFIGURATION
+# 2. CONTACTS RESPONSE TO INCIDENCE (OVERALL)
+# 3. CONTACTS RESPONSE TO MORTALITY (OVERALL)
+# 4. COMBINED: CONTACTS OVERALL
+# 5. CONTACTS RESPONSE TO INCIDENCE (BY PARTY)
+# 6. CONTACTS RESPONSE TO MORTALITY (BY PARTY)
+# 7. COMBINED: CONTACTS BY PARTY
+# 8. CONTACTS BY WAVE AND MORTALITY
+# 9. MASKS RESPONSE TO INCIDENCE (BY PARTY)
+# 10. MASKS RESPONSE TO MORTALITY (BY PARTY)
+# 11. COMBINED: MASKS BY PARTY
+# 12. CLEANUP
+# =============================================================================
+
+# =============================================================================
+# 1. SETUP AND CONFIGURATION
+# =============================================================================
+
+```{r setup, message=FALSE, warning=FALSE}
+library(stargazer)
+library(tidyverse)
+library(emmeans)
+library(cowplot)
+library(broom)
+
+emm_options(rg.limit = 775000)
+dodge_width <- .7
+
+# Load Data
+if (!exists("bics_zip_features")) {
+  if (file.exists("../data/BICS_ZIP_Features.csv")) {
+    bics_zip_features <- read_csv("../data/BICS_ZIP_Features.csv")
+  } else {
+    stop("Data file ../data/BICS_ZIP_Features.csv not found. Please run 00-Prep_BICS_Data.Rmd first.")
+  }
+}
+
+# Calculate weighted averages for emmeans
+average_hhsize <- weighted.mean(bics_zip_features$resp_hhsize, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+average_CD_dem <- weighted.mean(bics_zip_features$CD_PERCENT_DEMOCRAT, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+```
+
+Below, I want to find out who is more responsive to incidence and mortality rates (Democrats or Republicans).
+
+# =============================================================================
+# 2. CONTACTS RESPONSE TO INCIDENCE (OVERALL)
+# =============================================================================
+```{r}
+contacts_interaction_model1 <- lm(num_cc ~ log_prev_week_inc_rate + wave + interview_day_weekend + city,
+                          data = bics_zip_features,
+                          weights = weight_party_raked)
+
+print(summary(contacts_interaction_model1))
+
+contacts_interaction_model2 <- lm(num_cc ~ log_prev_week_inc_rate + wave + interview_day_weekend + city + age_group + r_race + resp_hispanic + r_male + educ_group + r_working + resp_hhsize, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+
+print(summary(contacts_interaction_model2))
+
+
+contacts_interaction_model3 <- lm(num_cc ~ log_prev_week_inc_rate + county_mask_mandate + r_metro + male + educ_group + age_group + resp_hhsize + r_race + resp_hispanic + r_working + city + wave + interview_day_weekend + CD_PERCENT_DEMOCRAT + STATE, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+print(summary(contacts_interaction_model3))
+
+
+log_prev_week_inc_rate_values <- seq(from = min(bics_zip_features$log_prev_week_inc_rate, na.rm = TRUE),
+                                     to = max(bics_zip_features$log_prev_week_inc_rate, na.rm = TRUE),
+                                     length.out = 100)
+
+emm_contacts1 <- emmeans(
+  contacts_interaction_model1,
+  specs = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+
+average_yob <- weighted.mean(bics_zip_features$age_group, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+average_hhsize <- weighted.mean(bics_zip_features$resp_hhsize, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+
+emm_contacts2 <- emmeans(
+  contacts_interaction_model2,
+  specs = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "No",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above")
+)
+
+
+average_CD_dem <- weighted.mean(bics_zip_features$CD_PERCENT_DEMOCRAT, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+
+emm_contacts3 <- emmeans(
+  contacts_interaction_model3,
+  specs = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+    wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "No",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above",
+            county_mask_mandate = "Strict",
+            r_metro = "1",
+            CD_PERCENT_DEMOCRAT = average_CD_dem,
+            STATE = "California")
+)
+
+
+df_emm_contacts1 <- as.data.frame(summary(emm_contacts1))
+df_emm_contacts2 <- as.data.frame(summary(emm_contacts2))
+df_emm_contacts3 <- as.data.frame(summary(emm_contacts3))
+
+df_emm_contacts1$model <- "1"
+df_emm_contacts2$model <- "2"
+df_emm_contacts3$model <- "3"
+
+all_emms <- rbind(df_emm_contacts1, df_emm_contacts2, df_emm_contacts3)
+
+contacts_interaction_plot <- ggplot(all_emms, aes(x = log_prev_week_inc_rate, y = emmean)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = emmean - SE, ymax = emmean + SE), alpha = 0.5, linetype = "blank") +
+  facet_wrap(~ model) +
+  scale_fill_manual(values = c("Independent" = "#6db753", "Republican" = "#c50000", "Democrat" = "#326ba4")) +
+  labs(
+    title = "Impact on Daily Contacts",
+    x = "Log Prev Week Inc Rate",
+    y = "Estimated Marginal Means",
+    color = "Political Party",
+    fill = "Political Party"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+contacts_interaction_plot
+
+mean_log_prev_week_inc_rate <- mean(log_prev_week_inc_rate_values, na.rm = TRUE)
+log_prev_week_inc_rate_values_10pct <- mean_log_prev_week_inc_rate * 1.10
+
+emm_contacts1 <- emmeans(
+  contacts_interaction_model1,
+  specs = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = mean_log_prev_week_inc_rate,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+emm_contacts1_10pct <- emmeans(
+  contacts_interaction_model1,
+  specs = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values_10pct,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+combined_emm <- rbind(mean_value = emm_contacts1, increased_value = emm_contacts1_10pct)
+
+contrast_results <- contrast(combined_emm, method = "revpairwise")
+
+contrast_df <- as.data.frame(contrast_results)
+
+contacts_interaction_diff_plot <- ggplot(contrast_df, aes(x = contrast, y = estimate, fill = contrast)) +
+  geom_bar(stat = "identity", alpha = 0.7, fill = "black", width = 0.5) +
+  geom_errorbar(aes(ymin = estimate - SE, ymax = estimate + SE), width = 0.2, color = "black") +
+  labs(
+    title = "Difference in Contacts Associated with a 10% Increase in Previous Week Incidence",
+    x = "",
+    y = "Difference in Estimated Marginal Means"
+  ) +
+  #ylim(-1.1, 0.11) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size=22),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 15),
+    legend.position="none", 
+    panel.grid.major.y=element_line(color="grey", size=0.5)
+  )
+
+print(contacts_interaction_diff_plot)
+```
+
+# =============================================================================
+# 3. CONTACTS RESPONSE TO MORTALITY (OVERALL)
+# =============================================================================
+```{r}
+contacts_interaction_model1 <- lm(num_cc ~ log_prev_week_mort_rate + wave + interview_day_weekend + city,
+                          data = bics_zip_features,
+                          weights = weight_party_raked)
+
+print(summary(contacts_interaction_model1))
+
+contacts_interaction_model2 <- lm(num_cc ~ log_prev_week_mort_rate + wave + interview_day_weekend + city + age_group + r_race + resp_hispanic + r_male + educ_group + r_working + resp_hhsize, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+
+print(summary(contacts_interaction_model2))
+
+
+contacts_interaction_model3 <- lm(num_cc ~ log_prev_week_mort_rate + log_prev_week_mort_rate + county_mask_mandate + r_metro + male + educ_group + age_group + resp_hhsize + r_race + resp_hispanic + r_working + city + wave + interview_day_weekend + CD_PERCENT_DEMOCRAT + STATE, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+print(summary(contacts_interaction_model3))
+
+
+log_prev_week_mort_rate_values <- seq(from = min(bics_zip_features$log_prev_week_mort_rate, na.rm = TRUE),
+                                     to = max(bics_zip_features$log_prev_week_mort_rate, na.rm = TRUE),
+                                     length.out = 100)
+
+emm_contacts1 <- emmeans(
+  contacts_interaction_model1,
+  specs = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+
+average_yob <- weighted.mean(bics_zip_features$age_group, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+average_hhsize <- weighted.mean(bics_zip_features$resp_hhsize, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+
+emm_contacts2 <- emmeans(
+  contacts_interaction_model2,
+  specs = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "Yes",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above")
+)
+
+
+average_CD_dem <- weighted.mean(bics_zip_features$CD_PERCENT_DEMOCRAT, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+
+emm_contacts3 <- emmeans(
+  contacts_interaction_model3,
+  specs = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+    wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "Yes",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above",
+            county_mask_mandate = "Strict",
+            r_metro = "1",
+            CD_PERCENT_DEMOCRAT = average_CD_dem,
+            STATE = "California")
+)
+
+
+df_emm_contacts1 <- as.data.frame(summary(emm_contacts1))
+df_emm_contacts2 <- as.data.frame(summary(emm_contacts2))
+df_emm_contacts3 <- as.data.frame(summary(emm_contacts3))
+
+df_emm_contacts1$model <- "1"
+df_emm_contacts2$model <- "2"
+df_emm_contacts3$model <- "3"
+
+all_emms <- rbind(df_emm_contacts1, df_emm_contacts2, df_emm_contacts3)
+
+contacts_interaction_plot <- ggplot(all_emms, aes(x = log_prev_week_mort_rate, y = emmean)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = emmean - SE, ymax = emmean + SE), alpha = 0.5, linetype = "blank") +
+  facet_wrap(~ model) +
+  scale_fill_manual(values = c("Independent" = "#6db753", "Republican" = "#c50000", "Democrat" = "#326ba4")) +
+  labs(
+    title = "Impact on Daily Contacts",
+    x = "Log Prev Week Mort Rate",
+    y = "Estimated Marginal Means",
+    color = "Political Party",
+    fill = "Political Party"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+contacts_interaction_plot
+
+mean_log_prev_week_mort_rate <- mean(log_prev_week_mort_rate_values, na.rm = TRUE)
+log_prev_week_mort_rate_values_10pct <- mean_log_prev_week_mort_rate * 1.10
+
+emm_contacts1 <- emmeans(
+  contacts_interaction_model1,
+  specs = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = mean_log_prev_week_mort_rate,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+emm_contacts1_10pct <- emmeans(
+  contacts_interaction_model1,
+  specs = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values_10pct,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+combined_emm <- rbind(mean_value = emm_contacts1, increased_value = emm_contacts1_10pct)
+
+contrast_results <- contrast(combined_emm, method = "revpairwise")
+
+contrast_df <- as.data.frame(contrast_results)
+
+contacts_interaction_diff_plot_mort <- ggplot(contrast_df, aes(x = contrast, y = estimate, fill = contrast)) +
+  geom_bar(stat = "identity", alpha = 0.7, fill = "black", width = 0.5) +
+  geom_errorbar(aes(ymin = estimate - SE, ymax = estimate + SE), width = 0.2, color = "black") +
+  labs(
+    title = "Difference in Contacts Associated with a 10% Increase in Previous Week Mortality",
+    x = "",
+    y = "Difference in Estimated Contacts"
+  ) +
+  #ylim(-1.1, 0.11) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size=22),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 15),
+    legend.position="none", 
+    panel.grid.major.y=element_line(color="grey", size=0.5)
+  )
+
+print(contacts_interaction_diff_plot_mort)
+```
+
+# =============================================================================
+# 4. COMBINED: CONTACTS OVERALL
+# =============================================================================
+```{r}
+contacts_interaction_diff_plot_mort <- contacts_interaction_diff_plot_mort + 
+  theme(legend.position = "none")
+
+combined_plot <- plot_grid(
+  plot_grid(contacts_interaction_diff_plot + theme(legend.position = "none"),
+            contacts_interaction_diff_plot_mort,
+            ncol = 1, labels = c("A", "B")),
+  ncol = 1
+)
+
+combined_plot <- plot_grid(
+  ggdraw() + draw_label("Figure", size = 16, hjust = 0, x = 0.01),
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.4, 10)
+)
+
+print(combined_plot)
+
+ggsave("combined_national_pooled_mortalty_and_incidence_response_contacts_overall.png", plot = combined_plot, path = "../out/plots", width = 14, height = 16, units = "in")
+```
+
+# =============================================================================
+# 5. CONTACTS RESPONSE TO INCIDENCE (BY PARTY)
+# =============================================================================
+```{r}
+rvd_contacts_interaction_model1 <- lm(num_cc ~ political_party*log_prev_week_inc_rate + wave + interview_day_weekend + city,
+                          data = bics_zip_features,
+                          weights = weight_party_raked)
+
+print(summary(rvd_contacts_interaction_model1))
+
+rvd_contacts_interaction_model2 <- lm(num_cc ~ political_party*log_prev_week_inc_rate + wave + interview_day_weekend + city + age_group + r_race + resp_hispanic + r_male + educ_group + r_working + resp_hhsize, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+
+print(summary(rvd_contacts_interaction_model2))
+
+
+rvd_contacts_interaction_model3 <- lm(num_cc ~ political_party*log_prev_week_inc_rate + log_prev_week_inc_rate + county_mask_mandate + r_metro + male + educ_group + age_group + resp_hhsize + r_race + resp_hispanic + r_working + city + wave + interview_day_weekend + CD_PERCENT_DEMOCRAT + STATE, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+print(summary(rvd_contacts_interaction_model3))
+
+
+log_prev_week_inc_rate_values <- seq(from = min(bics_zip_features$log_prev_week_inc_rate, na.rm = TRUE),
+                                     to = max(bics_zip_features$log_prev_week_inc_rate, na.rm = TRUE),
+                                     length.out = 100)
+
+emm_contacts1 <- emmeans(
+  rvd_contacts_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+
+average_yob <- weighted.mean(bics_zip_features$age_group, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+average_hhsize <- weighted.mean(bics_zip_features$resp_hhsize, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+
+emm_contacts2 <- emmeans(
+  rvd_contacts_interaction_model2,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "No",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above")
+)
+
+
+average_CD_dem <- weighted.mean(bics_zip_features$CD_PERCENT_DEMOCRAT, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+
+emm_contacts3 <- emmeans(
+  rvd_contacts_interaction_model3,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+    wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "No",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above",
+            county_mask_mandate = "Strict",
+            r_metro = "1",
+            CD_PERCENT_DEMOCRAT = average_CD_dem)
+)
+
+
+df_emm_contacts1 <- as.data.frame(summary(emm_contacts1))
+df_emm_contacts2 <- as.data.frame(summary(emm_contacts2))
+df_emm_contacts3 <- as.data.frame(summary(emm_contacts3))
+
+# Add model identifiers
+df_emm_contacts1$model <- "1"
+df_emm_contacts2$model <- "2"
+df_emm_contacts3$model <- "3"
+
+# Filter out "Prefer not to answer"
+df_emm_contacts1 <- df_emm_contacts1 %>% 
+  filter(political_party != "Prefer not to answer")
+
+df_emm_contacts2 <- df_emm_contacts2 %>% 
+  filter(political_party != "Prefer not to answer")
+
+df_emm_contacts3 <- df_emm_contacts3 %>% 
+  filter(political_party != "Prefer not to answer")
+
+all_emms <- rbind(df_emm_contacts1, df_emm_contacts2, df_emm_contacts3)
+
+rvd_contacts_interaction_plot <- ggplot(all_emms, aes(x = log_prev_week_inc_rate, y = emmean, color = political_party, fill = political_party)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = emmean - SE, ymax = emmean + SE), alpha = 0.5, linetype = "blank") +
+  facet_wrap(~ model) +
+  scale_fill_manual(values = c("Independent" = "#6db753", "Republican" = "#c50000", "Democrat" = "#326ba4")) +
+  labs(
+    title = "Impact on Daily Contacts",
+    x = "Log Prev Week Inc Rate",
+    y = "Estimated Marginal Means",
+    color = "Political Party",
+    fill = "Political Party"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+rvd_contacts_interaction_plot
+
+#version two plot, that shows ten percent increase in log prev week incidence rate
+mean_log_prev_week_inc_rate <- mean(log_prev_week_inc_rate_values, na.rm = TRUE)
+log_prev_week_inc_rate_values_10pct <- mean_log_prev_week_inc_rate * 1.10
+
+# Calculate estimated means for mean values
+emm_contacts1 <- emmeans(
+  rvd_contacts_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = mean_log_prev_week_inc_rate,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+# Calculate estimated means for increased values
+emm_contacts1_10pct <- emmeans(
+  rvd_contacts_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values_10pct,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National"
+))
+
+combined_emm <- rbind(
+  increased_value = emm_contacts1_10pct,
+  mean_value = emm_contacts1
+)
+
+contrast_results_reversed <- contrast(
+  combined_emm,
+  method = "pairwise",
+  by = "political_party",
+  reverse = TRUE
+)
+
+emm_diff_reversed_inc <- as.data.frame(contrast_results_reversed)
+
+emm_diff_reversed_inc <- emm_diff_reversed_inc %>% 
+  filter(political_party != "Prefer not to answer")
+
+
+rvd_contacts_interaction_diff_plot <- ggplot(emm_diff_reversed_inc, aes(x = political_party, y = estimate, fill = political_party)) +
+  geom_bar(stat = "identity", alpha = 0.7) +
+  scale_fill_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  geom_errorbar(aes(ymin = estimate - SE, ymax = estimate + SE), width = 0.2, color = "black") +
+  labs(
+    title = "Contacts in Response to Ten Percent Increase in Previous Week Incidence",
+    x = "Political Party",
+    y = "Change in Contacts"
+  ) +
+  ylim(-1.1, 0.25) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.position = "none", 
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+print(rvd_contacts_interaction_diff_plot)
+```
+
+# =============================================================================
+# 6. CONTACTS RESPONSE TO MORTALITY (BY PARTY)
+# =============================================================================
+```{r}
+rvd_contacts_interaction_model1 <- lm(num_cc ~ political_party*log_prev_week_mort_rate + wave + interview_day_weekend + city,
+                          data = bics_zip_features,
+                          weights = weight_party_raked)
+
+print(summary(rvd_contacts_interaction_model1))
+
+rvd_contacts_interaction_model2 <- lm(num_cc ~ political_party*log_prev_week_mort_rate + wave + interview_day_weekend + city + age_group + r_race + resp_hispanic + r_male + educ_group + r_working + resp_hhsize, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+
+print(summary(rvd_contacts_interaction_model2))
+
+
+rvd_contacts_interaction_model3 <- lm(num_cc ~ political_party*log_prev_week_mort_rate + county_mask_mandate + r_metro + male + educ_group + age_group + resp_hhsize + r_race + resp_hispanic + r_working + city + wave + interview_day_weekend + CD_PERCENT_DEMOCRAT + STATE, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+print(summary(rvd_contacts_interaction_model3))
+
+
+log_prev_week_mort_rate_values <- seq(from = min(bics_zip_features$log_prev_week_mort_rate, na.rm = TRUE),
+                                     to = max(bics_zip_features$log_prev_week_mort_rate, na.rm = TRUE),
+                                     length.out = 100)
+
+emm_contacts1 <- emmeans(
+  rvd_contacts_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+
+average_yob <- weighted.mean(bics_zip_features$age_group, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+average_hhsize <- weighted.mean(bics_zip_features$resp_hhsize, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+
+emm_contacts2 <- emmeans(
+  rvd_contacts_interaction_model2,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "Yes",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above")
+)
+
+
+average_CD_dem <- weighted.mean(bics_zip_features$CD_PERCENT_DEMOCRAT, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+
+emm_contacts3 <- emmeans(
+  rvd_contacts_interaction_model3,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+    wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "Yes",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above",
+            county_mask_mandate = "Strict",
+            r_metro = "1",
+            CD_PERCENT_DEMOCRAT = average_CD_dem)
+)
+
+
+df_emm_contacts1 <- as.data.frame(summary(emm_contacts1))
+df_emm_contacts2 <- as.data.frame(summary(emm_contacts2))
+df_emm_contacts3 <- as.data.frame(summary(emm_contacts3))
+
+# Add model identifiers
+df_emm_contacts1$model <- "1"
+df_emm_contacts2$model <- "2"
+df_emm_contacts3$model <- "3"
+
+# Filter out "Prefer not to answer"
+df_emm_contacts1 <- df_emm_contacts1 %>% 
+  filter(political_party != "Prefer not to answer")
+
+df_emm_contacts2 <- df_emm_contacts2 %>% 
+  filter(political_party != "Prefer not to answer")
+
+df_emm_contacts3 <- df_emm_contacts3 %>% 
+  filter(political_party != "Prefer not to answer")
+
+all_emms <- rbind(df_emm_contacts1, df_emm_contacts2, df_emm_contacts3)
+
+rvd_contacts_interaction_plot_mort <- ggplot(all_emms, aes(x = log_prev_week_mort_rate, y = emmean, color = political_party, fill = political_party)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = emmean - SE, ymax = emmean + SE), alpha = 0.5, linetype = "blank") +
+  facet_wrap(~ model) +
+  scale_fill_manual(values = c("Independent" = "#6db753", "Republican" = "#c50000", "Democrat" = "#326ba4")) +
+  labs(
+    title = "Impact on Daily Contacts",
+    x = "Log Mort Week Inc Rate",
+    y = "Estimated Marginal Means",
+    color = "Political Party",
+    fill = "Political Party"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+rvd_contacts_interaction_plot_mort
+
+#version two plot, that shows ten percent increase in log mort week incidence rate
+mean_log_prev_week_mort_rate <- mean(log_prev_week_mort_rate_values, na.rm = TRUE)
+log_prev_week_mort_rate_values_10pct <- mean_log_prev_week_mort_rate * 1.10
+
+# Calculate estimated means for mean values
+emm_contacts1 <- emmeans(
+  rvd_contacts_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_log_prev_week_mort_rate = mean_log_prev_week_mort_rate,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+# Calculate estimated means for increased values
+emm_contacts1_10pct <- emmeans(
+  rvd_contacts_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values_10pct,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+combined_emm <- rbind(
+  increased_value = emm_contacts1_10pct,
+  mean_value = emm_contacts1
+)
+
+contrast_results_reversed <- contrast(
+  combined_emm,
+  method = "pairwise",
+  by = "political_party",
+  reverse = TRUE
+)
+
+emm_diff_reversed_mort <- as.data.frame(contrast_results_reversed)
+
+emm_diff_reversed_mort <- emm_diff_reversed_mort %>% 
+  filter(political_party != "Prefer not to answer")
+
+
+rvd_contacts_interaction_diff_plot_mort <- ggplot(emm_diff_reversed_mort, aes(x = political_party, y = estimate, fill = political_party)) +
+  geom_bar(stat = "identity", alpha = 0.7, width = 0.7) +  # Reduced width for better visibility of error bars
+  scale_fill_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  geom_errorbar(aes(ymin = estimate - SE, ymax = estimate + SE), width = 0.2, color = "black", position = position_dodge(width = 0.7)) +
+  labs(
+    title = "Contacts in Response to Ten Percent Increase in Previous Week Mortality",
+    x = "Political Party",
+    y = "Change in Contacts"
+  ) +
+  coord_cartesian(ylim = c(-1.1, 0.25)) +  # Use coord_cartesian instead of ylim
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.position = "none", 
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+print(rvd_contacts_interaction_diff_plot_mort)
+```
+
+# =============================================================================
+# 7. COMBINED: CONTACTS BY PARTY
+# =============================================================================
+```{r}
+rvd_contacts_interaction_diff_plot_mort <- rvd_contacts_interaction_diff_plot_mort + 
+  theme(legend.position = "none")
+
+# Combine plots without legends
+combined_plot <- plot_grid(
+  plot_grid(rvd_contacts_interaction_diff_plot + theme(legend.position = "none"),
+            rvd_contacts_interaction_diff_plot_mort,
+            ncol = 1, labels = c("A", "B")),
+  ncol = 1
+)
+
+# Add a label to the combined plot
+combined_plot <- plot_grid(
+  ggdraw() + draw_label("Figure", size = 16, hjust = 0, x = 0.01),
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.4, 10)
+)
+
+# Display the final combined plot
+print(combined_plot)
+
+ggsave("combined_national_pooled_mortalty_and_incidence_response_contacts.png", plot = combined_plot, path = "../out/plots", width = 14, height = 16, units = "in")
+```
+
+# =============================================================================
+# 8. CONTACTS BY WAVE AND MORTALITY
+# =============================================================================
+
+I want to create a plot that shows predicted contacts based on average mortality rate at each wave.
+```{r}
+wave_avgs <- list()
+
+for (i in 1:6) {
+  avg <- bics_zip_features %>%
+    filter(wave == i) %>%
+    summarise(avg_log_prev_week_mort_rate = mean(log_prev_week_mort_rate, na.rm = TRUE)) %>%
+    pull(avg_log_prev_week_mort_rate)
+  
+  wave_avgs[[paste0("wave", i)]] <- avg
+}
+
+print(wave_avgs)
+
+wave1_estimated_contacts <- emmeans(
+  rvd_contacts_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = wave_avgs$wave1,
+            wave = "1",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+wave_estimated_contacts <- list()
+
+for (i in 1:6) {
+  wave_name <- paste0("wave", i)
+  
+  estimated_contacts <- emmeans(
+    rvd_contacts_interaction_model1,
+    specs = "political_party",
+    by = "log_prev_week_mort_rate",
+    at = list(log_prev_week_mort_rate = wave_avgs[[wave_name]],
+              wave = "2",
+              interview_day_weekend = "Weekday",
+              city = "National")
+  )
+  
+  wave_estimated_contacts[[wave_name]] <- estimated_contacts
+  
+}
+
+combined_estimated_contacts <- data.frame()
+
+for (i in 1:6) {
+  wave_name <- paste0("wave", i)
+  
+  wave_df <- as.data.frame(wave_estimated_contacts[[wave_name]])
+  
+  wave_df$wave <- i
+  
+  combined_estimated_contacts <- rbind(combined_estimated_contacts, wave_df)
+}
+
+rownames(combined_estimated_contacts) <- NULL
+
+print(head(combined_estimated_contacts))
+
+combined_estimated_contacts <- combined_estimated_contacts %>%
+  filter(political_party != "Prefer not to answer")
+
+contacts_mortality_response_waves <- ggplot(combined_estimated_contacts, aes(x = wave, y = emmean, color = political_party, group = political_party)) +
+  geom_point(size = 3, position = position_dodge(width = 0.3), alpha = 0.7) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2, position = position_dodge(width = 0.3), color = "black", alpha = 0.7) +
+  geom_line(position = position_dodge(width = 0.3)) +
+  scale_x_continuous(breaks = 1:6) +
+  scale_color_manual(values = c("Democrat" = "#326ba4", "Independent" = "#6db753", "Republican" = "#c50000")) +
+  labs(title = "Estimated Marginal Means of Contacts by Political Party and County-Level \nMortality Rates",
+       x = "Average Mortality Rate at Time of Wave",
+       y = "Estimated Mean Contacts",
+       color = "Political Party") +
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank()) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_text(size = 13),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.position = "bottom", 
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+contacts_mortality_response_waves
+
+ggsave("contacts_mortality_response_waves.png", plot = contacts_mortality_response_waves, path = "../out/plots", width = 12, height = 8, units = "in")
+```
+
+# =============================================================================
+# 9. MASKS RESPONSE TO INCIDENCE (BY PARTY)
+# =============================================================================
+```{r}
+rvd_masks_interaction_model1 <- lm(Norm_Masks_Used ~ political_party*log_prev_week_inc_rate + wave + interview_day_weekend + city,
+                                   data = bics_zip_features,
+                                   weights = weight_party_raked)
+
+rvd_masks_interaction_model2 <- lm(Norm_Masks_Used ~ political_party*log_prev_week_inc_rate + wave + interview_day_weekend + city + age_group + r_race + resp_hispanic + r_male + educ_group + r_working + resp_hhsize, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+rvd_masks_interaction_model3 <- lm(Norm_Masks_Used ~ political_party*log_prev_week_inc_rate + county_mask_mandate + r_metro + male + educ_group + age_group + resp_hhsize + r_race + resp_hispanic + r_working + city + wave + interview_day_weekend + CD_PERCENT_DEMOCRAT + STATE, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+mean_log_prev_week_inc_rate <- mean(log_prev_week_inc_rate_values, na.rm = TRUE)
+log_prev_week_inc_rate_values_10pct <- mean_log_prev_week_inc_rate * 1.10
+
+emm_masks1 <- emmeans(
+  rvd_masks_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+emm_masks2 <- emmeans(
+  rvd_masks_interaction_model2,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "Yes",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above")
+)
+
+emm_masks3 <- emmeans(
+  rvd_masks_interaction_model3,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "Yes",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above",
+            county_mask_mandate = "Strict",
+            r_metro = "1",
+            CD_PERCENT_DEMOCRAT = average_CD_dem)
+)
+
+df_emm_masks1 <- as.data.frame(summary(emm_masks1))
+df_emm_masks2 <- as.data.frame(summary(emm_masks2))
+df_emm_masks3 <- as.data.frame(summary(emm_masks3))
+
+df_emm_masks1$model <- "1"
+df_emm_masks2$model <- "2"
+df_emm_masks3$model <- "3"
+
+# Filter out "Prefer not to answer"
+df_emm_masks1 <- df_emm_masks1 %>% 
+  filter(political_party != "Prefer not to answer")
+
+df_emm_masks2 <- df_emm_masks2 %>% 
+  filter(political_party != "Prefer not to answer")
+
+df_emm_masks3 <- df_emm_masks3 %>% 
+  filter(political_party != "Prefer not to answer")
+
+# Combine data frames
+all_emms_masks <- rbind(df_emm_masks1, df_emm_masks2, df_emm_masks3)
+
+# Plot
+rvd_masks_interaction_plot <- ggplot(all_emms_masks, aes(x = log_prev_week_inc_rate, y = emmean, color = political_party, fill = political_party)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = emmean - SE, ymax = emmean + SE), alpha = 0.5, linetype = "blank") +
+  facet_wrap(~ model) +
+  scale_fill_manual(values = c("Independent" = "#6db753", "Republican" = "#c50000", "Democrat" = "#326ba4")) +
+  labs(
+    title = "Impact on Percent of Contacts With a Mask",
+    x = "Log Prev Week Inc Rate",
+    y = "Estimated Marginal Means",
+    color = "Political Party",
+    fill = "Political Party"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+rvd_masks_interaction_plot
+
+mean_log_prev_week_mort_rate <- mean(log_prev_week_mort_rate_values, na.rm = TRUE)
+log_prev_week_mort_rate_values_10pct <- mean_log_prev_week_mort_rate * 1.10
+
+emm_masks1 <- emmeans(
+  rvd_masks_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = mean_log_prev_week_inc_rate,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+# Calculate estimated means for increased values
+emm_masks1_10pct <- emmeans(
+  rvd_masks_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_inc_rate",
+  at = list(log_prev_week_inc_rate = log_prev_week_inc_rate_values_10pct,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National"
+))
+
+combined_emm <- rbind(
+  increased_value = emm_masks1_10pct,
+  mean_value = emm_masks1
+)
+
+contrast_results_reversed <- contrast(
+  combined_emm,
+  method = "pairwise",
+  by = "political_party",
+  reverse = TRUE
+)
+
+emm_diff_reversed_inc_masks <- as.data.frame(contrast_results_reversed)
+
+emm_diff_reversed_inc_masks <- emm_diff_reversed_inc_masks %>% 
+  filter(political_party != "Prefer not to answer")
+
+rvd_masks_interaction_diff_plot_inc <- ggplot(emm_diff_reversed_inc_masks, aes(x = political_party, y = estimate, fill = political_party)) +
+  geom_bar(stat = "identity", alpha = 0.7) +
+  geom_errorbar(aes(ymin = estimate - SE, ymax = estimate + SE), width = 0.2, color = "black") +
+  scale_fill_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  labs(
+    title = "Mask Usage in Response to 10% Increase in Previous Week Incidence",
+    x = "Political Party",
+    y = "Change in Mask Usage"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.position = "none", 
+    panel.grid.major.y = element_line(color = "grey", size=0.5)
+  )
+
+print(rvd_masks_interaction_diff_plot_inc)
+```
+
+# =============================================================================
+# 10. MASKS RESPONSE TO MORTALITY (BY PARTY)
+# =============================================================================
+```{r}
+rvd_masks_interaction_model1 <- lm(Norm_Masks_Used ~ political_party*log_prev_week_mort_rate + wave + interview_day_weekend + city,
+                                   data = bics_zip_features,
+                                   weights = weight_party_raked)
+
+rvd_masks_interaction_model2 <- lm(Norm_Masks_Used ~ political_party*log_prev_week_mort_rate + wave + interview_day_weekend + city + age_group + r_race + resp_hispanic + r_male + educ_group + r_working + resp_hhsize, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+rvd_masks_interaction_model3 <- lm(Norm_Masks_Used ~ political_party*log_prev_week_mort_rate + county_mask_mandate + r_metro + male + educ_group + age_group + resp_hhsize + r_race + resp_hispanic + r_working + city + wave + interview_day_weekend + CD_PERCENT_DEMOCRAT + STATE, 
+                                   data = bics_zip_features, 
+                                   weights = weight_party_raked)
+
+mean_log_prev_week_mort_rate <- mean(log_prev_week_mort_rate_values, na.rm = TRUE)
+log_prev_week_mort_rate_values_10pct <- mean_log_prev_week_mort_rate * 1.10
+
+emm_masks1 <- emmeans(
+  rvd_masks_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+emm_masks2 <- emmeans(
+  rvd_masks_interaction_model2,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "Yes",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above")
+)
+
+emm_masks3 <- emmeans(
+  rvd_masks_interaction_model3,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National",
+            age_group = "[18,30)",
+            r_race = "White",
+            resp_hispanic = "Yes",
+            r_male = "0",
+            r_working = "Working",
+            resp_hhsize = average_hhsize,
+            educ_group = "College graduate and above",
+            county_mask_mandate = "Strict",
+            r_metro = "1",
+            CD_PERCENT_DEMOCRAT = average_CD_dem)
+)
+
+df_emm_masks1 <- as.data.frame(summary(emm_masks1))
+df_emm_masks2 <- as.data.frame(summary(emm_masks2))
+df_emm_masks3 <- as.data.frame(summary(emm_masks3))
+
+df_emm_masks1$model <- "1"
+df_emm_masks2$model <- "2"
+df_emm_masks3$model <- "3"
+
+# Filter out "Prefer not to answer"
+df_emm_masks1 <- df_emm_masks1 %>% 
+  filter(political_party != "Prefer not to answer")
+
+df_emm_masks2 <- df_emm_masks2 %>% 
+  filter(political_party != "Prefer not to answer")
+
+df_emm_masks3 <- df_emm_masks3 %>% 
+  filter(political_party != "Prefer not to answer")
+
+# Combine data frames
+all_emms_masks <- rbind(df_emm_masks1, df_emm_masks2, df_emm_masks3)
+
+# Plot
+rvd_masks_interaction_plot_mort <- ggplot(all_emms_masks, aes(x = log_prev_week_mort_rate, y = emmean, color = political_party, fill = political_party)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = emmean - SE, ymax = emmean + SE), alpha = 0.5, linetype = "blank") +
+  facet_wrap(~ model) +
+  scale_fill_manual(values = c("Independent" = "#6db753", "Republican" = "#c50000", "Democrat" = "#326ba4")) +
+  labs(
+    title = "Impact on Percent of Contacts With a Mask",
+    x = "Log Prev Week Mort Rate",
+    y = "Estimated Marginal Means",
+    color = "Political Party",
+    fill = "Political Party"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+rvd_masks_interaction_plot_mort
+
+rvd_masks_interaction_plot
+
+mean_log_prev_week_mort_rate <- mean(log_prev_week_mort_rate_values, na.rm = TRUE)
+log_prev_week_mort_rate_values_10pct <- mean_log_prev_week_mort_rate * 1.10
+
+emm_masks1 <- emmeans(
+  rvd_masks_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = mean_log_prev_week_mort_rate,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National")
+)
+
+# Calculate estimated means for increased values
+emm_masks1_10pct <- emmeans(
+  rvd_masks_interaction_model1,
+  specs = "political_party",
+  by = "log_prev_week_mort_rate",
+  at = list(log_prev_week_mort_rate = log_prev_week_mort_rate_values_10pct,
+            wave = "2",
+            interview_day_weekend = "Weekday",
+            city = "National"
+))
+
+combined_emm <- rbind(
+  increased_value = emm_masks1_10pct,
+  mean_value = emm_masks1
+)
+
+contrast_results_reversed <- contrast(
+  combined_emm,
+  method = "pairwise",
+  by = "political_party",
+  reverse = TRUE
+)
+
+emm_diff_reversed_mort_masks <- as.data.frame(contrast_results_reversed)
+
+emm_diff_reversed_mort_masks <- emm_diff_reversed_mort_masks %>% 
+  filter(political_party != "Prefer not to answer")
+
+rvd_masks_interaction_diff_plot_mort <- ggplot(emm_diff_reversed_mort_masks, aes(x = political_party, y = estimate, fill = political_party)) +
+  geom_bar(stat = "identity", alpha = 0.7) +
+  geom_errorbar(aes(ymin = estimate - SE, ymax = estimate + SE), width = 0.2, color = "black") +
+  scale_fill_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  labs(
+    title = "Mask Usage in Response to 10% Increase in Previous Week Mortality",
+    x = "Political Party",
+    y = "Change in Mask Usage"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 15),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.position = "none", 
+    panel.grid.major.y = element_line(color = "grey", size=0.5)
+  )
+
+print(rvd_masks_interaction_diff_plot_mort)
+```
+
+# =============================================================================
+# 11. COMBINED: MASKS BY PARTY
+# =============================================================================
+```{r}
+rvd_masks_interaction_diff_plot_mort <- rvd_masks_interaction_diff_plot_mort + 
+  theme(legend.position = "none")
+
+# Combine plots without legends
+combined_plot <- plot_grid(
+  plot_grid(rvd_masks_interaction_diff_plot_inc + theme(legend.position = "none"),
+            rvd_masks_interaction_diff_plot_mort,
+            ncol = 1, labels = c("A", "B")),
+  ncol = 1
+)
+
+# Add a label to the combined plot
+combined_plot <- plot_grid(
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.4, 10)
+)
+
+# Display the final combined plot
+print(combined_plot)
+
+ggsave("combined_national_pooled_mortalty_and_incidence_response_masks.png", plot = combined_plot, path = "../out/plots", width = 14, height = 16, units = "in")
+```
+
+# =============================================================================
+# 12. CLEANUP
+# =============================================================================
+
+```{r cleanup}
+rm(rvd_vaccinated_interaction_plot, rvd_vaccinated_interaction_model3, rvd_vaccinated_interaction_model2, rvd_vaccinated_interaction_model1, rvd_masks_interaction_diff_plot, rvd_masks_interaction_plot, all_emms_vaccinated, all_emms, all_emms_masks, combined_emm, combined_plot, contrast_results_reversed, emm_vaccinated3, emm_vaccinated2, emm_vaccinated1, emm_vaccination3, emm_vaccination2, emm_vaccination1, emm_diff_reversed, log_prev_week_inc_rate_values, log_prev_week_inc_rate_values_10pct, log_prev_week_mort_rate_values, log_prev_week_mort_rate_values_10pct, average_CD_dem, average_hhsize, average_yob, mean_log_prev_week_inc_rate, mean_log_prev_week_mort_rate, mean_log_prev_week_mort_rate_rate, df_emm_contacts1, df_emm_contacts2, df_emm_contacts3, df_emm_masks1, df_emm_masks2, df_emm_masks3, emm_contacts1, emm_contacts1_10pct, emm_contacts2, emm_contacts3, emm_diff_reversed_inc, emm_diff_reversed_inc_masks, emm_diff_reversed_mort, emm_diff_reversed_mort_masks, emm_masks1, emm_masks1_10pct, emm_masks2, emm_masks3, rvd_contacts_interaction_diff_plot, rvd_contacts_interaction_diff_plot_mort, rvd_contacts_interaction_model1, rvd_contacts_interaction_model2, rvd_contacts_interaction_model3, rvd_masks_interaction_plot, rvd_contacts_interaction_plot, rvd_contacts_interaction_plot_mort, rvd_masks_interaction_diff_plot_inc, rvd_masks_interaction_diff_plot_mort, rvd_masks_interaction_model1, rvd_masks_interaction_model2, rvd_masks_interaction_model3, rvd_masks_interaction_plot_mort, combined_estimated_contacts, contacts_interaction_diff_plot, contacts_interaction_diff_plot_mort, contacts_interaction_model1, contacts_interaction_model2, contacts_interaction_model3, contacts_interaction_plot, contacts_mortality_response_waves, contrast_df, contrast_results, wave_avgs, R_county_CD_share, wave_avgs, wave_estimated_contacts, wave1_estimated_contacts, avg, dodge_width, i, wave_name, wave_df, estimated_contacts)
+```
+

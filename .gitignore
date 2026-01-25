@@ -1,0 +1,24 @@
+# Data files (symlinked, don't track)
+data/
+
+# R/RStudio
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Output files
+out/*.pdf
+out/*.png
+out/*.html
+out/*.csv
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*~
+*.tmp
+*.log

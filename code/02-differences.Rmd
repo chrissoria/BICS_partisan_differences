@@ -1,0 +1,471 @@
+---
+title: "differential_descriptives"
+author: "Christopher Soria"
+date: "2024-08-08"
+output: html_document
+---
+
+# =============================================================================
+# TABLE OF CONTENTS
+# -----------------------------------------------------------------------------
+# 1. SETUP AND CONFIGURATION
+# 2. CONTACTS DIFFERENCES
+# 3. MASK USAGE DIFFERENCES
+# 4. VACCINATION DIFFERENCES
+# 5. COMBINED PLOTS
+# 6. WAVE-LEVEL DIFFERENCES
+# =============================================================================
+
+# =============================================================================
+# 1. SETUP AND CONFIGURATION
+# =============================================================================
+
+```{r setup, message=FALSE, warning=FALSE}
+library(emmeans)
+library(cowplot)
+library(tidyverse)
+
+# Source helper functions
+source("plot_helper_functions/difference_helpers.R")
+
+# Load Data
+if (!exists("bics_zip_features")) {
+  if (file.exists("../data/BICS_ZIP_Features.csv")) {
+    bics_zip_features <- read_csv("../data/BICS_ZIP_Features.csv")
+  } else {
+    stop("Data file ../data/BICS_ZIP_Features.csv not found. Please run 00-Prep_BICS_Data.Rmd first.")
+  }
+}
+
+# Create party-specific dataframes
+RD_df <- bics_zip_features %>% filter(political_party %in% c("Republican", "Democrat"))
+ID_df <- bics_zip_features %>% filter(political_party %in% c("Independent", "Democrat"))
+D_df <- bics_zip_features %>% filter(political_party == "Democrat")
+R_df <- bics_zip_features %>% filter(political_party == "Republican")
+
+# Age-specific dataframes
+bics_65_plus <- bics_zip_features %>% filter(age >= 65)
+RD_65_plus <- RD_df %>% filter(age >= 65)
+ID_65_plus <- ID_df %>% filter(age >= 65)
+```
+
+# =============================================================================
+# 2. CONTACTS DIFFERENCES
+# =============================================================================
+
+
+## contacts
+```{r contacts}
+# Run demographic models and generate contrasts
+combined_contrasts <- run_demographic_models(
+  data = bics_zip_features,
+  outcome_var = "num_cc",
+  data_RD = RD_df,
+  data_ID = ID_df
+)
+
+print(combined_contrasts)
+
+# Plot contrasts
+pred_contacts <- plot_demographic_contrasts(
+  combined_contrasts,
+  title = "Difference in total number of contacts"
+)
+
+ggsave("contrast_contacts.png", plot = pred_contacts, path = "../out/plots", width = 12, height = 8, units = "in")
+
+pred_contacts
+```
+### contacts (old)
+```{r}
+bi_republican <- lm(num_cc ~ republican, data = RD_65_plus, weights = weight_party_raked)
+bi_independent <- lm(num_cc ~ Independent, data = ID_65_plus, weights = weight_party_raked)
+bi_race <- lm(num_cc ~ white, data = bics_65_plus, weights = weight_party_raked)
+bi_gender <- lm(num_cc ~ male, data = bics_65_plus, weights = weight_party_raked)
+bi_concern <- lm(num_cc ~ strong_concern_inverse, data = bics_65_plus, weights = weight_party_raked)
+bi_college <- lm(num_cc ~ r_college_grad, data = bics_65_plus, weights = weight_party_raked)
+
+emm_race <- emmeans(bi_race, specs = pairwise ~ white)
+emm_gender <- emmeans(bi_gender, specs = pairwise ~ male)
+emm_republican <- emmeans(bi_republican, specs = pairwise ~ republican)
+emm_independent <- emmeans(bi_independent, specs = pairwise ~ Independent)
+emm_concern <- emmeans(bi_concern, specs = pairwise ~ strong_concern_inverse)
+emm_college <- emmeans(bi_college, specs = pairwise ~ r_college_grad)
+
+contr_race <- contrast(emm_race, "pairwise")
+contr_gender <- contrast(emm_gender, "pairwise")
+contr_republican <- contrast(emm_republican, "pairwise")
+contr_independent <- contrast(emm_independent, "pairwise")
+contr_college <- contrast(emm_college, "pairwise")
+
+df_race_contrasts <- summary(contr_race) %>% as.data.frame()
+df_gender_contrasts <- summary(contr_gender) %>% as.data.frame()
+df_republican_contrasts <- summary(contr_republican) %>% as.data.frame()
+df_independent_contrasts <- summary(contr_independent) %>% as.data.frame()
+df_college_contrasts <- summary(contr_college) %>% as.data.frame()
+
+# Combine all emm_* data frames into one
+combined_contrasts <- bind_rows(df_independent_contrasts, df_republican_contrasts, df_college_contrasts, df_race_contrasts, df_gender_contrasts)
+combined_contrasts <- as.data.frame(combined_contrasts)
+
+combined_contrasts$contrast <- factor(combined_contrasts$contrast, levels = unique(combined_contrasts$contrast))
+
+print(combined_contrasts)
+
+
+pred_contacts_65 <- ggplot(combined_contrasts, aes(x = contrast, y = -1 * estimate, fill = contrast)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7, color = "black",  alpha = 0.7) +  # Draw bars
+  geom_errorbar(aes(ymin = -1 * (estimate + SE), ymax = -1 * (estimate - SE)), 
+                position = position_dodge(0.7), width = 0.25) +  # Add error bars
+  labs(x = "", y = "", title = "Difference in total number of contacts") +
+  scale_x_discrete(labels = c("Independent-\nDemocrat", "Republican-\nDemocrat", "College-\nNo-College", "White-\nNon-White", "Male-\nNon-Male")) +
+  scale_fill_manual(values = c("Independent0 - Independent1" = "#6db753", "republican0 - republican1" = "#c50000",
+                               "white0 - white1" = "gray", "male0 - male1" = "gray", "r_college_grad0 - r_college_grad1" = "gray")) +
+  theme_cowplot() + 
+  theme(legend.position = "none",
+        plot.title = element_text(size = 20),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        axis.title.x = element_text(size = 18),
+        axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 22),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10))
+
+ggsave("contrast_contact_65_plus.png", plot = pred_contacts_65, path = "../out/plots", width = 12, height = 8, units = "in")
+
+pred_contacts_65
+
+rm(emm_race, emm_gender, emm_age, emm_party, combined_contrasts, df_race_contrasts, df_gender_contrasts, df_age_contrasts, df_party_contrasts, contr_age, contr_gender, contr_party, contr_race, bi_age, bi_gender, bi_party, bi_race)
+```
+
+
+# =============================================================================
+# 3. MASK USAGE DIFFERENCES
+# =============================================================================
+
+## mask usage
+```{r masks}
+# Run demographic models and generate contrasts
+combined_contrasts_masks <- run_demographic_models(
+  data = bics_zip_features,
+  outcome_var = "Norm_Masks_Used",
+  data_RD = RD_df,
+  data_ID = ID_df
+)
+
+print(combined_contrasts_masks)
+
+# Plot contrasts
+pred_mask <- plot_demographic_contrasts(
+  combined_contrasts_masks,
+  title = "Difference in Percent of Contacts with a Mask"
+) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black")
+
+ggsave("contrast_masks.png", plot = pred_mask, path = "../out/plots", width = 12, height = 8, units = "in")
+
+pred_mask
+```
+### mask usage (old)
+```{r}
+bi_republican <- lm(Norm_Masks_Used ~ republican, data = RD_65_plus, weights = weight_party_raked)
+bi_independent <- lm(Norm_Masks_Used ~ Independent, data = ID_65_plus, weights = weight_party_raked)
+bi_race <- lm(Norm_Masks_Used ~ white, data = bics_65_plus, weights = weight_party_raked)
+bi_gender <- lm(Norm_Masks_Used ~ male, data = bics_65_plus, weights = weight_party_raked)
+bi_concern <- lm(Norm_Masks_Used ~ strong_concern_inverse, data = bics_65_plus, weights = weight_party_raked)
+bi_college <- lm(Norm_Masks_Used ~ r_college_grad, data = bics_65_plus, weights = weight_party_raked)
+
+emm_race <- emmeans(bi_race, specs = pairwise ~ white)
+emm_gender <- emmeans(bi_gender, specs = pairwise ~ male)
+emm_republican <- emmeans(bi_republican, specs = pairwise ~ republican)
+emm_independent <- emmeans(bi_independent, specs = pairwise ~ Independent)
+emm_concern <- emmeans(bi_concern, specs = pairwise ~ strong_concern_inverse)
+emm_college <- emmeans(bi_college, specs = pairwise ~ r_college_grad)
+
+contr_race <- contrast(emm_race, "pairwise")
+contr_gender <- contrast(emm_gender, "pairwise")
+contr_republican <- contrast(emm_republican, "pairwise")
+contr_independent <- contrast(emm_independent, "pairwise")
+contr_college <- contrast(emm_college, "pairwise")
+
+df_race_contrasts <- summary(contr_race) %>% as.data.frame()
+df_gender_contrasts <- summary(contr_gender) %>% as.data.frame()
+df_republican_contrasts <- summary(contr_republican) %>% as.data.frame()
+df_independent_contrasts <- summary(contr_independent) %>% as.data.frame()
+df_college_contrasts <- summary(contr_college) %>% as.data.frame()
+
+combined_contrasts <- bind_rows(df_independent_contrasts, df_republican_contrasts, df_college_contrasts, df_race_contrasts, df_gender_contrasts)
+combined_contrasts <- as.data.frame(combined_contrasts)
+
+combined_contrasts$contrast <- factor(combined_contrasts$contrast, levels = unique(combined_contrasts$contrast))
+
+print(combined_contrasts)
+
+pred_mask_65 <- ggplot(combined_contrasts, aes(x = contrast, y = -1 * estimate, fill = contrast)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7, color = "black",  alpha = 0.7) +  # Draw bars
+  geom_errorbar(aes(ymin = -1 * (estimate + SE), ymax = -1 * (estimate - SE)), 
+                position = position_dodge(0.7), width = 0.25) +  # Add error bars
+  labs(x = "", y = "", title = "Difference in Percent of Contacts with a Mask") +
+  scale_x_discrete(labels = c("Independent-\nDemocrat", "Republican-\nDemocrat", "College-\nNo-College", "White-\nNon-White", "Male-\nNon-Male")) +
+  scale_fill_manual(values = c("Independent0 - Independent1" = "#6db753", "republican0 - republican1" = "#c50000",
+                               "white0 - white1" = "gray", "male0 - male1" = "gray", "r_college_grad0 - r_college_grad1" = "gray")) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") + 
+  theme_cowplot() +
+  theme(legend.position = "none",
+        plot.title = element_text(size = 20),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        axis.title.x = element_text(size = 18),
+        axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 22),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10))
+
+ggsave("contrast_masks_65_plus.png", plot = pred_mask_65, path = "../out/plots", width = 12, height = 8, units = "in")
+
+pred_mask_65
+
+rm(emm_race, emm_gender, emm_age, emm_party, combined_contrasts, df_race_contrasts, df_gender_contrasts, df_age_contrasts, df_party_contrasts, contr_age, contr_gender, contr_party, contr_race, bi_age, bi_gender, bi_party, bi_race)
+```
+
+
+# =============================================================================
+# 4. VACCINATION DIFFERENCES
+# =============================================================================
+
+# vaccination
+```{r vaccines}
+# Run demographic models and generate contrasts
+combined_contrasts_vaccines <- run_demographic_models(
+  data = bics_zip_features,
+  outcome_var = "Vaccinated",
+  data_RD = RD_df,
+  data_ID = ID_df
+)
+
+print(combined_contrasts_vaccines)
+
+# Plot contrasts
+pred_vaccines <- plot_demographic_contrasts(
+  combined_contrasts_vaccines,
+  title = "Difference in Proportion Vaccinated"
+) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black")
+
+ggsave("contrast_vaccines.png", plot = pred_vaccines, path = "../out/plots", width = 12, height = 8, units = "in")
+
+pred_vaccines
+```
+### vaccination (old)
+```{r}
+bi_republican <- lm(Vaccinated ~ republican, data = RD_65_plus, weights = weight_party_raked)
+bi_independent <- lm(Vaccinated ~ Independent, data = ID_65_plus, weights = weight_party_raked)
+bi_race <- lm(Vaccinated ~ white, data = bics_65_plus, weights = weight_party_raked)
+bi_gender <- lm(Vaccinated ~ male, data = bics_65_plus, weights = weight_party_raked)
+bi_concern <- lm(Vaccinated ~ strong_concern_inverse, data = bics_65_plus, weights = weight_party_raked)
+bi_college <- lm(Vaccinated ~ r_college_grad, data = bics_65_plus, weights = weight_party_raked)
+
+emm_race <- emmeans(bi_race, specs = pairwise ~ white)
+emm_gender <- emmeans(bi_gender, specs = pairwise ~ male)
+emm_republican <- emmeans(bi_republican, specs = pairwise ~ republican)
+emm_independent <- emmeans(bi_independent, specs = pairwise ~ Independent)
+emm_concern <- emmeans(bi_concern, specs = pairwise ~ strong_concern_inverse)
+emm_college <- emmeans(bi_college, specs = pairwise ~ r_college_grad)
+
+contr_race <- contrast(emm_race, "pairwise")
+contr_gender <- contrast(emm_gender, "pairwise")
+contr_republican <- contrast(emm_republican, "pairwise")
+contr_independent <- contrast(emm_independent, "pairwise")
+contr_college <- contrast(emm_college, "pairwise")
+
+df_race_contrasts <- summary(contr_race) %>% as.data.frame()
+df_gender_contrasts <- summary(contr_gender) %>% as.data.frame()
+df_republican_contrasts <- summary(contr_republican) %>% as.data.frame()
+df_independent_contrasts <- summary(contr_independent) %>% as.data.frame()
+df_college_contrasts <- summary(contr_college) %>% as.data.frame()
+
+combined_contrasts <- bind_rows(df_independent_contrasts, df_republican_contrasts, df_college_contrasts, df_race_contrasts, df_gender_contrasts)
+combined_contrasts <- as.data.frame(combined_contrasts)
+
+combined_contrasts$contrast <- factor(combined_contrasts$contrast, levels = unique(combined_contrasts$contrast))
+
+print(combined_contrasts)
+
+pred_vaccines_65 <- ggplot(combined_contrasts, aes(x = contrast, y = -1 * estimate, fill = contrast)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7, color = "black",  alpha = 0.7) +  # Draw bars
+  geom_errorbar(aes(ymin = -1 * (estimate + SE), ymax = -1 * (estimate - SE)), 
+                position = position_dodge(0.7), width = 0.25) +  # Add error bars
+  labs(x = "", y = "", title = "Difference in Proportion Vaccinated") +
+  scale_x_discrete(labels = c("Independent-\nDemocrat", "Republican-\nDemocrat", "College-\nNo-College", "White-\nNon-White", "Male-\nNon-Male")) +
+  scale_fill_manual(values = c("Independent0 - Independent1" = "#6db753", "republican0 - republican1" = "#c50000",
+                               "white0 - white1" = "gray", "male0 - male1" = "gray", "r_college_grad0 - r_college_grad1" = "gray")) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") + 
+  theme_cowplot() +
+  theme(legend.position = "none",
+        plot.title = element_text(size = 20),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        axis.title.x = element_text(size = 18),
+        axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 22),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10))
+
+
+ggsave("contrast_vaccines_65_plus.png", plot = pred_vaccines_65, path = "../out/plots", width = 12, height = 8, units = "in")
+
+pred_vaccines_65
+
+rm(emm_race, emm_gender, emm_age, emm_party, combined_contrasts, df_race_contrasts, df_gender_contrasts, df_age_contrasts, df_party_contrasts, contr_age, contr_gender, contr_party, contr_race, bi_age, bi_gender, bi_party, bi_race)
+```
+
+
+# =============================================================================
+# 5. COMBINED PLOTS
+# =============================================================================
+
+## merging differences plots
+```{r}
+combined_plot <- plot_grid(pred_contacts, pred_mask, pred_vaccines, ncol = 1,labels = c("A", "B", "C"))
+
+combined_plot <- plot_grid(
+  ggdraw() + draw_label("", size = 16, hjust = 0, x = 0.01),
+  combined_plot,
+  ncol = 1, 
+  rel_heights = c(0.4, 10) 
+)
+
+combined_plot
+
+ggsave("combined_contrasts.png", plot = combined_plot, path = "../out/plots", width = 12, height = 12, units = "in")
+
+rm(combined_plot, pred_contacts, pred_mask, pred_vaccines)
+```
+## mergind differences plots (old)
+```{r}
+combined_plot_65 <- plot_grid(pred_contacts_65, pred_mask_65, pred_vaccines_65, ncol = 1,labels = c("A", "B", "C"))
+
+combined_plot_65 <- plot_grid(
+  ggdraw() + draw_label("", size = 16, hjust = 0, x = 0.01),
+  combined_plot_65,
+  ncol = 1, 
+  rel_heights = c(0.4, 10) 
+)
+
+combined_plot_65
+
+ggsave("combined_contrasts_65_plus.png", plot = combined_plot_65, path = "../out/plots", width = 12, height = 12, units = "in")
+
+rm(combined_plot_65, pred_contacts_65, pred_mask_65, pred_vaccines_65)
+```
+
+
+# =============================================================================
+# 6. WAVE-LEVEL DIFFERENCES
+# =============================================================================
+
+Let's plot differences by wave now:
+```{r}
+average_by_wave_dems <- D_df %>%
+  group_by(data_collected_dates) %>%
+  summarise(
+    average_num_cc = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    average_mask_usage = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    average_safety_index = weighted.mean(Non_Weighted_Safety_Index, w = weight_party_raked, na.rm = TRUE),
+    average_vaccinated = weighted.mean(Vaccinated, w = weight_party_raked, na.rm = TRUE)
+  )
+
+average_by_wave_repubs <- R_df %>%
+  group_by(data_collected_dates) %>%
+  summarise(
+    average_num_cc = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    average_mask_usage = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    average_safety_index = weighted.mean(Non_Weighted_Safety_Index, w = weight_party_raked, na.rm = TRUE),
+    average_vaccinated = weighted.mean(Vaccinated, w = weight_party_raked, na.rm = TRUE)
+  )
+
+#identifying the parties
+average_by_wave_dems$group <- 'Democrats'
+average_by_wave_repubs$group <- 'Republicans'
+
+average_by_wave <- rbind(average_by_wave_dems, average_by_wave_repubs)
+
+# Calculate the differences
+average_diff_by_wave <- average_by_wave_repubs %>%
+  inner_join(average_by_wave_dems, by = "data_collected_dates", suffix = c("_repubs", "_dems")) %>%
+  mutate(
+    average_diff_contacts = average_num_cc_repubs - average_num_cc_dems,
+    average_diff_masks = average_mask_usage_repubs - average_mask_usage_dems,
+    average_diff_safety = average_safety_index_repubs - average_safety_index_dems,
+    average_diff_vaccines = average_vaccinated_repubs - average_vaccinated_dems
+  ) %>%
+  select(data_collected_dates, starts_with("average_diff"))
+
+write_csv(average_by_wave, "../data/party_average_by_wave.csv")
+write_csv(average_diff_by_wave, "../data/party_average_by_wave_differences.csv")
+
+average_by_wave
+average_diff_by_wave
+
+rvd_masks_diff_by_wave <- ggplot(average_diff_by_wave, aes(x = factor(data_collected_dates), y = average_diff_masks)) +
+  geom_bar(stat = "identity", fill = "#c50000", color = "black", alpha = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Difference in Percent of Contacts with a Mask (Republicans - Democrats) \nOver Time",
+       x = "Data Collection Period",
+       y = "") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(size = 22),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_line(color = "grey70", size = 0.5),
+    panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 14, angle = 45, hjust = 1, vjust = 1),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_text(size = 16),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    plot.margin = margin(10, 10, 10, 10)
+  ) +
+  guides(shape = guide_legend(override.aes = list(size = 6)),
+         color = "none", 
+         size = "none")
+
+ggsave("rvd_difference_masks_waves.png", plot = rvd_masks_diff_by_wave, path = "../out/plots", width = 12, height = 8, units = "in")
+
+rvd_contacts_diff_by_wave <-  ggplot(average_diff_by_wave, aes(x = factor(data_collected_dates), y = average_diff_contacts)) +
+  geom_bar(stat = "identity", fill = "#c50000", color = "black", alpha = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Difference in Average Contacts (Republicans - Democrats) Over Time",
+       x = "Data Collection Period",
+       y = "") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(size = 22),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_line(color = "grey70", size = 0.5),
+    panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 14, angle = 45, hjust = 1, vjust = 1),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_text(size = 16),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    plot.margin = margin(10, 10, 10, 10)
+  ) +
+  guides(shape = guide_legend(override.aes = list(size = 6)),
+         color = "none", 
+         size = "none")
+
+ggsave("rvd_difference_contacts_waves.png", plot = rvd_contacts_diff_by_wave, path = "../out/plots", width = 12, height = 8, units = "in")
+
+rm(average_by_wave, average_by_wave_dems, average_by_wave_repubs, average_diff_by_wave, rvd_masks_contacts_by_wave, rvd_masks_diff_by_wave, bi_college, bi_concern, bi_independent, contr_college, contr_independent, contr_republican, df_college_contrasts, df_independent_contrasts, df_republican_contrasts, emm_college, emm_concern, emm_independent, emm_republican, rvd_contacts_diff_by_wave, bi_republican)
+```
+

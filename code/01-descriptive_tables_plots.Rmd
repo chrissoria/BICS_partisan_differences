@@ -1,0 +1,1115 @@
+---
+title: "descriptive_tables_plots"
+author: "Christopher Soria"
+date: "2023-11-08"
+output: html_document
+---
+# =============================================================================
+# TABLE OF CONTENTS
+# -----------------------------------------------------------------------------
+# 1. SETUP AND CONFIGURATION
+# 2. TABLE 1: PANDEMIC BEHAVIORS BY PARTY
+# 3. TABLE 1 (NATIONAL ONLY)
+# 4. TABLE 2: DEMOGRAPHICS BY PARTY
+# 5. TABLE 2 (NATIONAL ONLY)
+# 6. TABLE 3: BEHAVIORS ACROSS WAVES
+# 7. TABLE 4: OVERALL BEHAVIORS
+# 8. TABLE 5: OVERALL BEHAVIORS OVER TIME
+# 9. PLOTS: DENSITY AND DISTRIBUTIONS
+# =============================================================================
+
+# =============================================================================
+# 1. SETUP AND CONFIGURATION
+# =============================================================================
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(data.table)
+library(dplyr)
+library(xtable)
+library(knitr)
+library(cowplot)
+library(scales) 
+library(forcats)
+library(tidyr)
+library(purrr)
+library(stringr)
+library(srvyr)
+library(survey)
+library(emmeans)
+library(car)
+
+# Source helper functions
+source("plot_helper_functions/descriptive_helpers.R")
+
+# Load Data
+# Check if data exists in environment, if not load it
+if (!exists("bics_zip_features")) {
+  if (file.exists("../data/BICS_ZIP_Features.csv")) {
+    bics_zip_features <- read_csv("../data/BICS_ZIP_Features.csv")
+  } else {
+    stop("Data file ../data/BICS_ZIP_Features.csv not found. Please run 00-Prep_BICS_Data.Rmd first.")
+  }
+}
+```
+
+# =============================================================================
+# 2. TABLE 1: PANDEMIC BEHAVIORS BY PARTY
+# =============================================================================
+
+```{r table1}
+# Calculate means
+average_by_party <- calculate_behavior_means(bics_zip_features, "political_party") %>%
+  arrange(factor(political_party, levels = c("Republican", "Independent", "Democrat")))
+
+print(average_by_party)
+
+# Format table
+average_by_party_table <- format_behavior_table(
+  average_by_party, 
+  col_names = c("Republicans", "Independents", "Democrats")
+)
+
+print(average_by_party_table)
+
+# Export to LaTeX
+add_line <- list(pos = list(4), command = c("\\hline "))
+export_latex_table(
+  average_by_party_table,
+  file_path = "../plots/tables/table1.tex",
+  caption = "Pandemic Behaviors by Political Affiliation\\footnote{Data collected across multiple waves during COVID-19 pandemic (April 2020-May 2021). Contacts refer to daily interpersonal interactions. Vaccination data was collected only during the last wave.}",
+  align = "llrrr",
+  add_line = add_line
+)
+```
+# =============================================================================
+# 3. TABLE 1 (NATIONAL ONLY)
+# =============================================================================
+
+```{r table1_national}
+# Filter for national city
+national_data <- bics_zip_features %>% filter(city == "National")
+
+# Calculate means
+average_by_party_national <- calculate_behavior_means(national_data, "political_party")
+
+print(average_by_party_national)
+
+# Format table
+# Note: The original code had different column ordering (Dem, Ind, Rep) compared to Table 1
+average_by_party_table_national <- format_behavior_table(
+  average_by_party_national,
+  col_names = c("Democrats", "Independents", "Republicans") 
+) %>%
+  rename(Variable = `Reported Behavior`) # Rename first column to match original output
+
+print(average_by_party_table_national)
+
+# Export to LaTeX
+export_latex_table(
+  average_by_party_table_national,
+  file_path = "../plots/tables/table1_national_only.tex",
+  caption = "Pandemic Behaviors by Political Affiliation (National Sample Only)",
+  align = "ll|l|l|l"
+)
+```
+
+# =============================================================================
+# 4. TABLE 2: DEMOGRAPHICS BY PARTY
+# =============================================================================
+
+```{r table2}
+# Calculate demographic means
+average_by_party_features <- bics_zip_features %>%
+  filter(political_party != "Prefer not to answer") %>% 
+  group_by(political_party) %>%
+  summarise(
+    average_age = weighted.mean(age, w = weight_party_raked, na.rm = TRUE),
+    average_household_size = weighted.mean(resp_hhsize, w = weight_party_raked, na.rm = TRUE),
+    average_male = (weighted.mean(male, w = weight_party_raked, na.rm = TRUE))*100,
+    average_white = (weighted.mean(white, w = weight_party_raked, na.rm = TRUE))*100,
+    average_hispanic = (weighted.mean(r_hispanic_num, w = weight_party_raked, na.rm = TRUE))*100,
+    average_metro = (weighted.mean(Metro, w = weight_party_raked, na.rm = TRUE))*100,
+    average_college = ((weighted.mean(as.numeric(r_college_grad), w = weight_party_raked, na.rm = TRUE))-1)*100,
+    average_employed = (weighted.mean(r_working_num, w = weight_party_raked, na.rm = TRUE))*100
+  )
+
+print(average_by_party_features)
+
+# Plotting partisan demographics
+feature_labels <- c(
+  "age" = "Age",
+  "college" = "College Educated %",
+  "employed" = "Employed %",
+  "white" = "White %",
+  "hispanic" = "Hispanic %",
+  "male" = "Male %",
+  "metro" = "Living in Metro %",
+  "household_size" = "Household Size"
+)
+
+long_data <- average_by_party_features %>%
+  pivot_longer(cols = starts_with("average_"),
+               names_to = "feature",
+               values_to = "value") %>%
+  mutate(feature = gsub("average_", "", feature)) %>% 
+  mutate(feature = factor(feature, levels = names(feature_labels), labels = feature_labels))
+
+partisan_demographics_plot <- ggplot(long_data, aes(x = value, y = political_party, fill = political_party)) +
+  geom_col(width = .5, alpha = 0.75, color = "black") +
+  geom_text(aes(label = sprintf("%.1f", value), x = value), 
+            hjust = -0.3, size = 4, fontface = "bold") +
+  facet_wrap(~ feature, scales = "free_x", ncol = 3) +
+  labs(title = element_blank(), x = element_blank(), y = element_blank()) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5, face = "bold"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+    axis.title.x = element_text(size = 18),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 16),
+    strip.text = element_text(size = 16, face = "bold"),
+    legend.position = "none"
+  ) +
+  scale_fill_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  coord_cartesian(clip = "off") +
+  facet_wrap(~ feature, scales = "free_x", ncol = 3, labeller = label_wrap_gen(width = 15))
+
+print(partisan_demographics_plot)
+ggsave("partisan_demographics_plot.png", plot = partisan_demographics_plot, path = "../plots/Descriptives", width = 12, height = 8, units = "in")
+
+# Format Table 2
+average_by_party_features <- t(as.data.frame(average_by_party_features))
+average_by_party_features <- as.data.frame(average_by_party_features)
+average_by_party_features <- average_by_party_features[-1, ]
+
+average_by_party_features[] <- lapply(average_by_party_features, function(x) round(as.numeric(as.character(x)), 2))
+
+average_by_party_features <- average_by_party_features %>% 
+  mutate(Variable = c("Average Age", "Average Household Size", "% Male","% White", "% Hispanic", "% Living in Metro", "% College Degree", "% Employed")) %>% 
+  dplyr::select(Variable, everything()) %>% 
+  rename(Democrats = V1, Independents = V2, Republicans = V3)
+
+print(average_by_party_features)
+
+export_latex_table(
+  average_by_party_features,
+  file_path = "../plots/tables/table2.tex",
+  caption = "Demographic Characteristics by Political Affiliation",
+  align = "ll|l|l|l"
+)
+```
+
+# =============================================================================
+# 5. TABLE 2 (NATIONAL ONLY)
+# =============================================================================
+
+```{r table2_national}
+average_by_party_features_national <- bics_zip_features %>%
+  filter(political_party != "Prefer not to answer") %>% 
+  filter(city == "National") %>% 
+  group_by(political_party) %>%
+  summarise(
+    average_age = mean(age, na.rm = TRUE),
+    average_household_size = mean(resp_hhsize, na.rm = TRUE),
+    average_male = (mean(male, na.rm = TRUE))*100,
+    average_white = (mean(white, na.rm = TRUE))*100,
+    average_hispanic = (mean(r_hispanic_num, na.rm = TRUE))*100,
+    average_metro = (mean(Metro, na.rm = TRUE))*100,
+    average_college = (mean(r_college_grad, na.rm = TRUE))*100,
+    average_employed = (mean(r_working_num, na.rm = TRUE))*100
+  )
+
+print(average_by_party_features_national)
+
+average_by_party_features_national <- t(as.data.frame(average_by_party_features_national))
+average_by_party_features_national <- as.data.frame(average_by_party_features_national)
+average_by_party_features_national <- average_by_party_features_national[-1, ]
+
+average_by_party_features_national[] <- lapply(average_by_party_features_national, function(x) round(as.numeric(as.character(x)), 2))
+
+average_by_party_features_national <- average_by_party_features_national %>% 
+  mutate(Variable = c("Average Age", "Average Household Size", "% Male","% White", "% Hispanic", "% Living in Metro", "% College Degree", "% Employed")) %>% 
+  dplyr::select(Variable, everything()) %>% 
+  rename(Democrats = V1, Independents = V2, Republicans = V3)
+
+print(average_by_party_features_national)
+
+export_latex_table(
+  average_by_party_features_national,
+  file_path = "../plots/tables/table2_national_only.tex",
+  caption = "Demographic Characteristics by Political Affiliation (National Sample Only)",
+  align = "ll|l|l|l"
+)
+
+rm(average_by_party_features_national)
+```
+#table 3 and plot (across waves)
+```{r}
+average_by_party_wave_list <- list()
+
+for (party in c("Democrat", "Independent", "Republican")) {
+  average_by_party_wave <- bics_zip_features %>%
+    filter(political_party == party) %>%
+    group_by(political_party, data_collected_dates) %>%
+    summarise(
+      total_contacts = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+      non_hh_contacts = weighted.mean(num_cc_nonhh, w = weight_party_raked, na.rm = TRUE),
+      mask_usage = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+      vaccinated = weighted.mean(Vaccinated, w = weight_party_raked, na.rm = TRUE)
+    ) %>%
+    mutate(across(where(is.numeric), ~round(., digits = 2)))
+  
+  average_by_party_wave <- t(as.data.frame(average_by_party_wave))
+  average_by_party_wave <- as.data.frame(average_by_party_wave)
+  
+  average_by_party_wave <- average_by_party_wave %>%
+  slice(-1, -2) %>% 
+  mutate(
+    party = party,
+    Variable = c("Total Contacts", "Non-Household Contacts", "% Contacts with a Mask", "% Vaccinated")
+  ) %>% 
+  dplyr::select(party, Variable, everything())
+  
+  colnames(average_by_party_wave) <- c("party","Behaviors", "Apr, '20", "Jun, '20",	"Sept, '20'", "Dec, '20'", "Feb, '21'", "May, '21'")
+  
+  average_by_party_wave_list[[party]] <- average_by_party_wave
+}
+
+average_by_party_wave
+
+for (party in c("Democrat", "Independent", "Republican")) {
+  cat("\nResults for", party, ":\n")
+  print(average_by_party_wave_list[[party]])
+}
+
+average_by_party_wave <- bind_rows(average_by_party_wave_list) %>%
+  mutate(party = case_when(
+    row_number() %in% c(2:4, 6:8, 10:12) ~ "",
+    TRUE ~ party
+  ),
+  )
+
+average_by_party_wave
+
+average_by_party_wave_code <- xtable(average_by_party_wave, caption = "Reported Pandemic Behaviors by Political Affiliation Across Waves", 
+                      align = "lllcccccl")
+
+add_line <- list(
+  pos = list(4, 8),
+  command = c("\\hline ", "\\hline ")
+)
+
+sink("../plots/tables/table3.tex")
+print(average_by_party_wave_code, type = "latex", 
+      caption.placement = "top",
+      size = "\\small",
+      add.to.row = add_line,
+      include.rownames = FALSE)
+
+sink()
+
+average_by_party_wave_list <- list()
+
+for (party in c("Democrat", "Independent", "Republican")) {
+  average_by_party_wave <- bics_zip_features %>%
+    filter(political_party == party) %>%
+    group_by(political_party, data_collected_dates) %>%
+    summarise(
+      total_contacts = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+      non_hh_contacts = weighted.mean(num_cc_nonhh, w = weight_party_raked, na.rm = TRUE),
+      mask_usage = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+      vaccinated = weighted.mean(Vaccinated, w = weight_party_raked, na.rm = TRUE)
+    )
+  
+  average_by_party_wave <- as.data.frame(average_by_party_wave)
+  
+  average_by_party_wave_list[[party]] <- average_by_party_wave
+}
+
+average_by_party_wave <- bind_rows(average_by_party_wave_list)
+
+average_by_party_wave
+
+ggplot(average_by_party_wave, aes(x = data_collected_dates, y = total_contacts, fill = political_party)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.6) + 
+  labs(title = "Average Total Contacts by Party Over Time",
+       x = "Date Collected",
+       y = "Total Contacts",
+       fill = "Political Party") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(average_by_party_wave, aes(x = data_collected_dates, y = total_contacts, color = political_party, group = political_party)) +
+  geom_line(size = 1) +  
+  geom_point(size = 2) + 
+  labs(title = "Average Total Contacts by Party Over Time",
+       x = "Date Collected",
+       y = "Total Contacts",
+       color = "Political Party") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+contacts_over_waves_plot <- ggplot(average_by_party_wave, aes(x = data_collected_dates, y = total_contacts, color = political_party, group = political_party)) +
+  geom_line(size = 1) +  
+  geom_point(size = 2) + 
+  labs(title = "Average Total Contacts Over Time",
+       x = "Date Collected",
+       y = "Total Contacts",
+       color = "Political Party") +
+  scale_color_manual(values = c("#326ba4", "#6db753", "#c50000"), guide = guide_legend(direction = "horizontal")) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+
+masks_over_waves_plot <- ggplot(average_by_party_wave, aes(x = data_collected_dates, y = mask_usage, color = political_party, group = political_party)) +
+  geom_line(size = 1) +  
+  geom_point(size = 2) + 
+  labs(title = "Percentage of Contacts with a Mask Over Time",
+       x = "Date Collected",
+       y = "Mask Usage",
+       color = "Political Party") +
+  scale_color_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+vaccines_plot <- ggplot(average_by_party_wave, aes(x = political_party, y = vaccinated, fill = political_party)) +
+  geom_col(width = 0.7) +  # Using geom_col() instead of geom_bar()
+  scale_fill_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  labs(
+    title = "Vaccination Rates by Political Party",
+    x = "Political Party",
+    y = "Proportion Vaccinated"
+  ) +
+  #coord_cartesian(ylim = c(0, 1)) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 22, hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    legend.position = "none"
+  )
+
+print(vaccines_plot)
+
+legend <- get_legend(contacts_over_waves_plot)
+
+contacts_plot_no_legend <- contacts_over_waves_plot + theme(legend.position = "none")
+masks_plot_no_legend <- masks_over_waves_plot + theme(legend.position = "none")
+
+combined_plot <- plot_grid(
+  plot_grid(contacts_plot_no_legend, 
+            masks_plot_no_legend, 
+            #vaccines_plot + theme(legend.position = "none"),
+            ncol = 1, labels = c("A", "B")),
+  legend,
+  ncol = 1,
+  rel_heights = c(1, 0.1)  
+)
+
+print(combined_plot)
+
+ggsave("contacts_mask_over_waves.png", plot = combined_plot, path = "../out/plots", width = 12, height = 14, units = "in")
+```
+### table 3 only n counts
+```{r}
+n_counts_list <- list()
+
+for (party in c("Republican", "Independent", "Democrat")) {
+  n_counts <- bics_zip_features %>%
+    filter(political_party == party) %>%
+    group_by(data_collected_dates) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    arrange(data_collected_dates) %>%
+    pull(n)
+  
+  party_n <- data.frame(
+    party = party,
+    stringsAsFactors = FALSE
+  )
+  
+  for(i in 1:length(n_counts)) {
+    party_n[paste0("wave_", i)] <- n_counts[i]
+  }
+  
+  n_counts_list[[party]] <- party_n
+}
+
+n_counts_table <- bind_rows(n_counts_list)
+
+colnames(n_counts_table) <- c("party", "Apr, '20", "Jun, '20", "Sept, '20'", "Dec, '20'", "Feb, '21'", "May, '21'")
+
+n_counts_table[, 2:7] <- lapply(n_counts_table[, 2:7], function(x) format(x, big.mark = ",", scientific = FALSE))
+
+n_counts_table_code <- xtable(n_counts_table, 
+                             caption = "Sample Sizes by Political Affiliation Across Waves\\footnote{Data collected across multiple waves during COVID-19 pandemic (April 2020-May 2021).}", 
+                             align = "llrrrrrr")
+
+sink("../plots/tables/n_counts_table.tex")
+print(n_counts_table_code, type = "latex", 
+      caption.placement = "top",
+      size = "\\small",
+      include.rownames = FALSE)
+sink()
+
+n_counts_table
+```
+
+# =============================================================================
+# 7. TABLE 4: OVERALL BEHAVIORS
+# =============================================================================
+
+```{r table4}
+average_behaviors <- bics_zip_features %>%
+  filter(political_party != "Prefer not to answer") %>% 
+  summarise(
+    num_cc = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    num_non_houshold_cc = weighted.mean(num_cc_nonhh, w = weight_party_raked, na.rm = TRUE),
+    percent_mask = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    vaccinated = weighted.mean(Vaccinated, w = weight_party_raked, na.rm = TRUE)*100
+  )
+
+print(average_behaviors)
+
+# Format for display
+average_behaviors <- as.data.frame(average_behaviors)
+average_behaviors[] <- lapply(average_behaviors, function(x) round(as.numeric(x), 2))
+
+average_behaviors <- average_behaviors %>% 
+  rename(
+    `Total Contacts` = num_cc,
+    `Non-Household Contacts` = num_non_houshold_cc,
+    `% Contacts with a Mask` = percent_mask,
+    `% Vaccinated` = vaccinated
+  )
+
+print(average_behaviors)
+
+# Export
+export_latex_table(
+  average_behaviors,
+  file_path = "../plots/tables/table4.tex",
+  caption = "Overall Reported Pandemic Behaviors",
+  align = "lllcr"
+)
+```
+## table 5, overall averages over time
+```{r}
+average_behaviors_waves <- bics_zip_features %>%
+  group_by(data_collected_dates) %>% 
+  filter(political_party != "Prefer not to answer") %>% 
+  summarise(
+    num_cc = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    num_non_houshold_cc = weighted.mean(num_cc_nonhh, w = weight_party_raked, na.rm = TRUE),
+    percent_mask = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    vaccinated = weighted.mean(Vaccinated, w = weight_party_raked, na.rm = TRUE)*100
+  )
+
+print(average_behaviors_waves)
+
+average_behaviors_waves <- as.data.frame(average_behaviors_waves)
+
+print(average_behaviors_waves)
+
+for (col in 2:5) {
+  average_behaviors_waves[, col] <- as.numeric(as.character(average_behaviors_waves[, col]))
+}
+
+average_behaviors_waves[, 2:5] <- round(average_behaviors_waves[, 2:5], digits = 2)
+
+print(average_behaviors_waves)
+
+average_behaviors_waves <- average_behaviors_waves %>% 
+  rename(
+    `Date Collected` = data_collected_dates, 
+    `Total Contacts` = num_cc,
+    `Non-Household Contacts` = num_non_houshold_cc,
+    `% Contacts with a Mask` = percent_mask,
+    `% Vaccinated` = vaccinated
+  )
+
+print(average_behaviors_waves)
+
+average_behaviors_waves <- xtable(average_behaviors_waves, caption = "Overall Reported Pandemic Behaviors Over Time", 
+                      align = "llcccc")
+
+sink("../plots/tables/table5.tex")
+print(average_behaviors_waves, type = "latex", 
+      caption.placement = "top",
+      size = "\\normal",
+      include.rownames = FALSE)
+sink()
+```
+
+# =============================================================================
+# 9. PLOTS: DENSITY AND DISTRIBUTIONS
+# =============================================================================
+
+```{r density_plots}
+filtered_df <- bics_zip_features %>% 
+  filter(political_party != "Prefer not to answer")
+
+# Contacts Density Plot
+contacts_density_plot <- plot_density_by_party(
+  filtered_df, 
+  x_var = "num_cc_15_max", 
+  title = "Density of Contacts", 
+  x_label = "Number of Contacts"
+) +
+  scale_x_continuous(
+    breaks = seq(0, 15, by = 5),
+    labels = c("0", "5", "10", "15+")
+  )
+
+# Masks Density Plot
+masks_density_plot <- ggplot(filtered_df, aes(x = political_party, y = Norm_Masks_Used, fill = political_party)) +
+  geom_violin(trim = FALSE, alpha = 0.7) +
+  scale_fill_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  labs(
+    title = "Percentage of Contacts with a Mask",
+    x = "Political Party",
+    y = "Percentage"
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+# Vaccinated Density Plot
+filtered_df_no_na <- filtered_df %>% filter(!is.na(Vaccinated))
+
+proportion_df <- filtered_df_no_na %>%
+  group_by(political_party, Vaccinated) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  mutate(prop = count / sum(count)) %>% 
+  filter(Vaccinated == 1)
+
+vaccinated_density_plot <- ggplot(proportion_df, aes(x = as.factor(Vaccinated), y = prop, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.2), width = 0.4, color = "black",  alpha = 0.7) +
+  scale_fill_manual(values = c("#326ba4", "#6db753", "#c50000")) +
+  facet_wrap(~ political_party) +
+  labs(
+    title = "Proportion Vaccinated",
+    x = "Vaccination Status",
+    y = "Proportion",
+    fill = "Political Party"
+  ) +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+# Combine Plots
+legend <- get_legend(
+  contacts_density_plot + 
+  theme(legend.position = "bottom", 
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        legend.margin = margin(t = 10, r = 10, b = 10, l = 10))
+)
+
+combined_plot <- plot_grid(
+  plot_grid(contacts_density_plot + theme(legend.position = "none"),
+            masks_density_plot + theme(legend.position = "none"),
+            vaccinated_density_plot + theme(legend.position = "none"),
+            ncol = 1, labels = c("A", "B", "C")),
+  legend,
+  ncol = 1,
+  rel_heights = c(1, 0.1)
+)
+
+combined_plot <- plot_grid(
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.4, 10) 
+)
+
+print(combined_plot)
+ggsave("combined_national_density.png", plot = combined_plot, path = "../plots/Descriptives", width = 12, height = 14, units = "in")
+
+rm(combined_plot, contacts_density_plot, masks_density_plot, vaccinated_density_plot, filtered_df_no_na, filtered_df)
+```
+
+```{r}
+rm(filtered_df)
+```
+
+```{r}
+all_cases <- read.csv("../data/incidence/owid-covid-data.csv")
+
+all_cases <- all_cases %>% 
+  filter(location == "United States" & new_cases != 0)
+
+all_cases <- all_cases %>%
+  mutate(date = as.Date(date))
+
+cases_bics_context <- ggplot(all_cases, aes(x = date, y = new_cases)) +
+  geom_bar(stat = "identity", fill = "gray", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = as.Date("2020-04-12"), color = "red", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = as.Date("2021-05-23"), color = "red", linetype = "dashed", size = 1) +
+  labs(title = "BICS Data Collection Window and US COVID-19 Cases Over Time",
+       x = "Date",
+       y = "New Weekly Cases") +
+  scale_x_date(
+    date_breaks = "2 month",
+    date_labels = "%b %Y",
+    expand = c(0.01, 0)
+  ) +
+  scale_y_continuous(labels = scales::comma) +  # This line formats the y-axis
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.ticks.x = element_line()
+  ) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12), # Rotate x-axis text
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+cases_bics_context
+
+ggsave("cases_and_bics_in_context.jpg", plot = cases_bics_context, path = "../out/plots", width = 12, height = 8, units = "in")
+```
+Next, I want to create another version of this plot with only the waves of data collected in BICS
+```{r}
+all_cases_bics_only_window <- all_cases %>% 
+  filter(date >= as.Date("2020-04-12") & date <= as.Date("2021-05-23")) %>% 
+         mutate(highlight = ifelse(date %in% as.Date(c("2020-04-12", "2020-04-19", "2020-04-26", "2020-05-03","2020-06-14","2020-06-21","2020-09-13","2020-09-20","2020-12-06","2021-02-07","2021-02-14","2021-05-16","2021-05-23")), "red", "gray"))
+
+cases_bics_only_window <- ggplot(all_cases_bics_only_window, aes(x = date, y = new_cases, fill = highlight)) +
+  geom_bar(stat = "identity", color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("gray" = "gray", "red" = "red")) +
+  labs(title = "BICS Data Collection Window and US COVID-19 Cases Over Time",
+       x = "Date",
+       y = "New Weekly Cases") +
+  scale_x_date(
+    date_breaks = "2 month",
+    date_labels = "%b %Y",
+    expand = c(0.01, 0)
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.position = "none",
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+cases_bics_only_window
+
+ggsave("cases_and_bics_only_window.jpg", plot = cases_bics_only_window, path = "../out/plots", width = 12, height = 8, units = "in")
+```
+
+```{r}
+all_cases_bics_only <- all_cases %>%
+  filter(date %in% as.Date(c("2020-04-12", "2020-04-19", "2020-04-26", "2020-05-03",
+                             "2020-06-14", "2020-06-21", "2020-09-13", "2020-09-20",
+                             "2020-12-06", "2021-02-07", "2021-02-14", "2021-05-16",
+                             "2021-05-23")))
+
+max_cases <- max(all_cases_bics_only_window$new_cases, na.rm = TRUE)
+
+specific_dates <- as.Date(c("2020-04-19",
+                            "2020-06-14",
+                            "2020-09-13",
+                            "2020-12-06", 
+                            "2021-02-07",
+                            "2021-05-16"))
+
+cases_bics_only <- ggplot(all_cases_bics_only, aes(x = date, y = new_cases)) +
+  geom_bar(stat = "identity", color = "black", fill = "red", alpha = 0.7) + 
+  labs(title = "BICS Data Collection Window and US COVID-19 Cases Over Time",
+       x = "Date",
+       y = "New Weekly Cases") +
+  scale_x_date(
+    breaks = specific_dates,
+    date_labels = "%b %Y",
+    expand = c(0.01, 0)
+  ) +
+  scale_y_continuous(labels = scales::comma,
+                     limits = c(0, max_cases)) +
+  theme_cowplot() +
+  theme(
+    strip.text = element_blank(),
+    plot.title = element_text(size = 22),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 22),
+    axis.title.y = element_blank(),
+    legend.position = "none",
+    panel.grid.major.y = element_line(color = "grey", size = 0.5)
+  )
+
+print(cases_bics_only)
+
+ggsave("cases_and_bics_only.jpg", plot = cases_bics_only, path = "../out/plots", width = 12, height = 8, units = "in")
+```
+#vaccine table
+```{r}
+# create vaccination behavior summary table by political party
+average_by_party2 <- bics_zip_features %>%
+  filter(political_party != "Prefer not to answer") %>%
+  filter(wave == 6) %>% 
+  group_by(political_party) %>%
+  summarise(
+    vaccinated = weighted.mean(Vaccinated, w = weight_party_raked, na.rm = TRUE) * 100,
+    will_get_vax = weighted.mean(will_get_vax[Vaccinated == 0], w = weight_party_raked[Vaccinated == 0], na.rm = TRUE) * 100,
+    will_not_get_vax = weighted.mean(will_not_get_vax[Vaccinated == 0], w = weight_party_raked[Vaccinated == 0], na.rm = TRUE) * 100,
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(factor(political_party, levels = c("Republican", "Independent", "Democrat")))
+
+print(average_by_party2)
+
+# format table with parties as rows, behaviors as columns
+average_by_party_table2 <- average_by_party2 %>%
+  # round numeric columns
+  mutate(across(c(vaccinated, will_get_vax, will_not_get_vax), ~ round(.x, 1))) %>%
+  # rename columns with proper labels
+  rename(
+    `Political Party` = political_party,
+    ` ` = vaccinated,
+    `% Will Get Vaccine` = will_get_vax,
+    `% Won't Get Vaccine` = will_not_get_vax,
+    `N` = n
+  )
+
+print(average_by_party_table2)
+
+# create latex table
+average_by_party_table2_code <- xtable(average_by_party_table2, 
+                                     caption = "Vaccination Behavior by Political Affiliation (Wave 6)", 
+                                     align = "lr|rrrr")  # add vertical line after 2nd column
+
+# create custom header rows with multicolumn
+header_rows <- list(
+  pos = list(-1),  # only before first row
+  command = c(
+    "\\hline & \\multicolumn{1}{c|}{\\% Vaccinated} & \\multicolumn{3}{c}{Not vaccinated} \\\\ \n \\hline "
+  )
+)
+
+# add horizontal line above last row (before N column) 
+add_line2 <- list(
+  pos = list(2),  
+  command = c("\\hline ")
+)
+
+# combine both modifications
+combined_lines <- list(
+  pos = c(header_rows$pos, add_line2$pos),
+  command = c(header_rows$command, add_line2$command)
+)
+
+# export to latex file
+sink("../plots/tables/vaccination_behavior_table_wave6.tex")
+print(average_by_party_table2_code, type = "latex", 
+      caption.placement = "top",
+      size = "\\normal",
+      add.to.row = combined_lines,
+      include.rownames = FALSE)
+sink()
+```
+#volatility table
+```{r}
+# --- Packages ---
+# --- Packages loaded in setup ---
+
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    data_collected_dates = as.character(data_collected_dates),
+    data_collected_dates = str_replace_all(data_collected_dates, "’", "'"), # curly -> straight
+    data_collected_dates = str_squish(data_collected_dates),
+    data_collected_dates = str_remove(data_collected_dates, "'$")           # remove final trailing '
+  )
+
+# 2) Set levels to the exact (cleaned) strings you actually have
+wave_levels <- c(
+  "April 11-May 5, '20",
+  "June 18-24, '20",
+  "September 12-20, '20",
+  "December 1-7, '20",
+  "February 9-14, '21",
+  "May 14-25, '21"
+)
+
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    data_collected_dates = factor(data_collected_dates, levels = wave_levels),
+    political_party = factor(political_party, levels = c("Democrat", "Independent", "Republican"))
+  )
+
+# (Optional) If you want short labels for plots/tables, create a separate label var:
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    wave_short = fct_recode(
+      data_collected_dates,
+      "Apr, '20" = "April 11-May 5, '20",
+      "Jun, '20" = "June 18-24, '20",
+      "Sept, '20"= "September 12-20, '20",
+      "Dec, '20" = "December 1-7, '20",
+      "Feb, '21" = "February 9-14, '21",
+      "May, '21" = "May 14-25, '21"
+    )
+  )
+
+# --- Survey design (respondent-level; keep this for all inference) ---
+des <- bics_zip_features %>% 
+  filter(!is.na(political_party)) %>% 
+  as_survey_design(ids = 1, weights = weight_party_raked)
+
+# =============================
+# A) DESCRIPTIVE TABLE (means + 95% CI), by Party × Wave
+# =============================
+vars <- c(
+  total_contacts = "num_cc",
+  non_hh_contacts = "num_cc_nonhh",
+  mask_usage     = "Norm_Masks_Used"
+)
+
+desc_long <- des %>%
+  group_by(political_party, wave_short) %>%
+  summarise(
+    across(all_of(vars),
+           ~ survey_mean(get(cur_column()), vartype = c("ci"), na.rm = TRUE),
+           .names = "{.col}_{.fn}")
+  ) %>%
+  ungroup()
+
+# The above produces columns like total_contacts, total_contacts_low, total_contacts_upp, etc.
+# Reshape to a tidy "Behaviors × Wave" table (one row per behavior per party).
+pretty_map <- c(
+  total_contacts  = "Total Contacts",
+  non_hh_contacts = "Non-Household Contacts",
+  mask_usage      = "% Contacts with a Mask"
+)
+
+df2 <- desc_long %>%
+  # 1) Make implicit means explicit: *_1  ->  *_1_mean
+  rename_with(
+    ~ sub("(\\d+)$", "\\1_mean", .x),
+    .cols = matches("_(\\d+)$")   # columns ending with _<digits>
+  )
+
+# 2) Pivot: (metric)_(wave)_(mean|low|upp)
+desc_tidy <- df2 %>%
+  pivot_longer(
+    cols = -c(political_party, wave_short),
+    names_to = c("metric", "wave", ".value"),
+    names_pattern = "^(.*)_(\\d+)_(mean|low|upp)$"
+  ) %>%
+  mutate(wave = as.integer(wave))
+
+# Optional: format to a wide presentation table with rounded means (and CIs in parentheses)
+desc_wide <- desc_tidy %>%
+  mutate(
+    mean_r = round(mean, 2),
+    low_r  = round(low,  2),
+    upp_r  = round(upp,  2),
+    cell   = sprintf("%0.2f (%0.2f, %0.2f)", mean_r, low_r, upp_r)
+  ) %>%
+  select(political_party, metric, wave_short, cell) %>%
+  pivot_wider(
+    names_from = wave_short,
+    values_from = cell
+  ) %>%
+  arrange(political_party, metric)
+
+# If you want the exact same column names order as before:
+desc_wide <- desc_wide %>%
+  relocate(
+    political_party, metric,
+    `Apr, '20`, `Jun, '20`, `Sept, '20`, `Dec, '20`, `Feb, '21`, `May, '21`,
+    .after = metric
+  )
+
+# desc_wide is your descriptive table (means + 95% CI), not collapsing sample size.
+
+
+# =============================
+# B) INFERENCE VIA svyglm + emmeans (party differences within each wave)
+# =============================
+
+# Example: Total Contacts ~ party * wave
+fit_total_contacts <- svyglm(
+  num_cc ~ political_party * wave_short,
+  design = des
+)
+
+# Pairwise party contrasts WITHIN each wave (Tukey-adjusted)
+dsgn <- svydesign(
+  ids     = ~1,
+  weights = ~weight_party_raked,
+  data    = bics_zip_features
+)
+
+# Example: Total Contacts ~ party * wave
+fit_total_contacts <- svyglm(
+  num_cc ~ political_party * wave_short,
+  design = dsgn
+)
+
+# emmeans needs the data if it can't recover it (safe to always provide)
+emm_tc <- emmeans(
+  fit_total_contacts,
+  ~ political_party | wave_short,
+  data = bics_zip_features
+)
+
+contr_tc <- contrast(emm_tc, method = "pairwise", adjust = "tukey") |> as.data.frame()
+
+# contr_tc has: data_collected_dates, contrast (e.g., Democrat - Independent), estimate, SE, df, t.ratio, p.value, lower.CL, upper.CL
+
+# Repeat easily for the other outcomes:
+dsgn <- svydesign(ids = ~1, weights = ~weight_party_raked, data = bics_zip_features)
+
+# 2) Formulas list — fine as-is
+formulas <- list(
+  total_contacts  = num_cc ~ political_party * wave_short,
+  non_hh_contacts = num_cc_nonhh ~ political_party * wave_short,
+  mask_usage      = Norm_Masks_Used ~ political_party * wave_short
+)
+
+# 3) Fit svyglm models on the survey::svydesign (NOT the srvyr object)
+fits <- purrr::imap(formulas, ~ svyglm(.x, design = dsgn))
+
+# 4) emmeans helper (pass data= to avoid the "$call$data" issue)
+emmeans_by_wave <- function(fit) {
+  e  <- emmeans(fit, ~ political_party | wave_short, data = bics_zip_features)
+  ct <- contrast(e, method = "pairwise", adjust = "tukey")
+  # add 95% CIs:
+  summary(ct, infer = c(TRUE, TRUE)) |> as.data.frame()
+  # alternatively: confint(ct) |> as.data.frame()
+}
+
+party_contrasts <- purrr::imap_dfr(fits, ~{
+  out <- emmeans_by_wave(.x)
+  out$metric <- .y
+  out
+})
+
+# Robust column pick (works whether df is present or not)
+keep <- intersect(
+  c("metric","wave_short","contrast","estimate","SE","df","t.ratio","p.value","lower.CL","upper.CL"),
+  names(party_contrasts)
+)
+party_contrasts <- dplyr::select(party_contrasts, dplyr::all_of(keep))
+
+
+
+# =============================
+# C) OPTIONAL: "Volatility" across waves using design-based means
+# =============================
+volatility_results <- desc_tidy %>%
+  filter(metric == "total_contacts") %>%
+  group_by(political_party) %>%
+  summarise(
+    std_dev      = sd(mean, na.rm = TRUE),
+    variance     = var(mean, na.rm = TRUE),
+    cv           = sd(mean, na.rm = TRUE) / mean(mean, na.rm = TRUE),
+    mean_contacts = mean(mean, na.rm = TRUE),
+    .groups = "drop"
+  ) %>% mutate(across(where(is.numeric), round, 2))
+
+
+# --- Packages loaded in setup ---
+
+# prepare volatility results with rounded numbers
+levene_result <- leveneTest(num_cc ~ political_party, 
+                           data = filter(bics_zip_features, !is.na(political_party)))
+
+# create test results rows
+test_results <- data.frame(
+  political_party = c("", "Levene Test", "p-value"),
+  std_dev = c("", paste("F =", round(levene_result$`F value`[1], 3)), ""),
+  variance = c("", paste("df =", levene_result$Df[1]), round(levene_result$`Pr(>F)`[1], 3)),
+  cv = c("", "", ifelse(levene_result$`Pr(>F)`[1] < 0.05, "Significant*", "Not Significant")),
+  mean_contacts = c("", "", "")
+)
+
+# combine tables
+final_table <- rbind(volatility_results, test_results)
+
+# clean column names
+colnames(final_table) <- c("Political Party", "Standard Deviation", "Variance", 
+                          "Coefficient of Variation", "Mean Contacts")
+
+# create xtable
+volatility_table_code <- xtable(final_table, 
+                               caption = "Volatility Measures and Levene's Test for Total Contacts by Political Party", 
+                               align = "lr|rrrr")
+
+sink("../plots/tables/volatility_contacts_table.tex")
+print(volatility_table_code, type = "latex", 
+      caption.placement = "top",
+      size = "\\normal",
+      include.rownames = FALSE)
+sink()
+```
+
+```{r}
+rm(all_cases, all_cases_bics_only, all_cases_bics_only_window, average_behaviors, average_behaviors_waves, average_by_party)
+rm(average_by_party_wave_code, average_by_party_wave, average_by_party_table_code, average_by_party_table, average_by_party_features_code, average_by_party_features)
+rm(legend, masks_over_waves_plot, masks_plot_no_legend, partisan_demographics_plot)
+rm(cases_df, cases_bics_only_window, cases_bics_only, cases_bics_context)
+rm(contacts_over_waves_plot, contacts_plot_no_legend, proportion_df, col, feature_labels, party, specific_dates, get_scale, max_cases)
+rm(long_data, average_by_party_wave_list, add_line)
+```
+

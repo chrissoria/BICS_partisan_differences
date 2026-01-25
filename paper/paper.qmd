@@ -1,0 +1,31 @@
+---
+title: "Partisan Differences in Health Behaviors During the COVID-19 Pandemic"
+author: "Christopher Soria"
+date: today
+format:
+  pdf:
+    toc: true
+    number-sections: true
+  html:
+    toc: true
+    number-sections: true
+bibliography: references.bib
+---
+
+# Introduction
+
+# Methods
+
+# Results
+
+## Partisan Differences in Behaviors and Perceptions of Pandemic Severity
+
+## Geographic Variation in Partisan Behaviors and Perceptions
+
+## Variation Over Time and as a Response to Incidence and Mortality Rates
+
+# Discussion
+
+# Conclusion
+
+# References

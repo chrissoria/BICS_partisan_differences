@@ -1,0 +1,2254 @@
+---
+title: "Comparison"
+author: "Christopher Soria"
+date: "2024-01-24"
+output: html_document
+---
+
+# =============================================================================
+# TABLE OF CONTENTS
+# -----------------------------------------------------------------------------
+# 1. SETUP AND CONFIGURATION
+# 2. ZIP CODE FEATURE ENGINEERING
+#    - ZIP to CD Mapping
+#    - ZIP to County Mapping
+#    - Congressional District Data
+#    - Mask Mandate Data
+# 3. COVID-19 DATA PROCESSING
+#    - Incidence Data (Waves 1-6)
+#    - Mortality Data (Waves 1-6)
+# 4. ADDITIONAL FEATURES
+#    - Urban/Rural Codes
+#    - State Lockdown Restrictions
+#    - Presidential Election Data
+#    - CD Demographic Data
+# 5. BICS SURVEY DATA MERGE
+#    - Load Survey Data
+#    - Process Variables (Party, Race, Employment)
+#    - Merge with ZIP Features
+# 6. FINAL DATASET PREPARATION
+#    - Variable Cleanup
+#    - Derived Variables (IFR, Vaccination)
+#    - Export
+# =============================================================================
+
+```{r setup, message=FALSE, warning=FALSE}
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library(stringr)
+```
+
+```{r}
+ayesha_path <- 'insert_path_here'
+dennis_path <- 'insert_path_here'
+chris_path <- '/Users/chrissoria/Documents/Research/BICS_partisan_differences'
+```
+
+# =============================================================================
+# 1. SETUP AND CONFIGURATION
+# =============================================================================
+
+# switch between manual and combined
+```{r config}
+file_type <- "manual" #do the merge manually
+setwd(chris_path) #user enters file path here
+merge_0 <- FALSE #keep wave 0
+
+path_set <- getwd()
+print(path_set)
+
+# --- CONSTANTS ---
+VOTE_SHARE_LOW <- 33.1
+VOTE_SHARE_HIGH <- 66.1
+
+CD_SHARE_Q1 <- 0.25
+CD_SHARE_Q2 <- 0.50
+CD_SHARE_Q3 <- 0.75
+
+# --- HELPER FUNCTIONS ---
+
+process_covid_wave <- function(file_path, dates, extra_dates = NULL, wave_num, output_path, type = "incidence") {
+  # dates should be a vector of 4 strings: c(col1, col2, col3, col4) for calculation
+  # extra_dates: additional columns to keep
+  
+  all_dates <- unique(c(dates, extra_dates))
+  
+  # Read data
+  df <- read_csv(file_path, col_types = cols(.default = col_guess()))
+  
+  # Filter and clean FIPS
+  df <- df %>%
+    filter(iso2 == 'US') %>%
+    mutate(FIPS = as.character(FIPS),
+           FIPS = if_else(!is.na(FIPS) & str_detect(FIPS, "\\."), str_remove(FIPS, "0+$|\\.$"), FIPS),
+           FIPS = str_pad(FIPS, width = 5, pad = "0")) %>%
+    select(all_of(c('FIPS', all_dates)))
+  
+  # Define variable names
+  if (type == "incidence") {
+    var_main <- paste0("wave_", wave_num, "_incidence")
+    var_lag  <- paste0("wave_", wave_num, "_inc_week_lag")
+  } else {
+    var_main <- paste0("wave_", wave_num, "_mortality")
+    var_lag  <- paste0("wave_", wave_num, "_mort_week_lag")
+  }
+  
+  # Calculate differences
+  # Ensure columns are numeric
+  df <- df %>%
+    mutate(
+      !!var_main := as.numeric(.data[[dates[1]]]) - as.numeric(.data[[dates[3]]]),
+      !!var_lag  := as.numeric(.data[[dates[2]]]) - as.numeric(.data[[dates[4]]])
+    )
+  
+  # Write output
+  write_csv(df, output_path)
+  
+  return(df)
+}
+```
+
+# =============================================================================
+# 2. ZIP CODE FEATURE ENGINEERING
+# =============================================================================
+
+# some ZIP Codes, such as "unique" ZIPs that are often tied to an internal mail-routing mechanism (such as UC Berkeley which has its own internal ZIP code and mail-routing system) will have very low ratios).
+# As of 12/23 I'm realzing that I'll need to start with a complete list of all ZIP codes (from USPS) before I start this so I can get a good sense of completeness.
+
+# Below, I'm reading in that full list of ZIP codes
+```{r}
+ZIP_to_CD_df <- read_excel(paste0(path_set,'/Data/ZIP_CD_062020.xlsx')) %>%
+  rename(
+    CD_RES_RATIO = RES_RATIO,
+    CD_BUS_RATIO = BUS_RATIO,
+    CD_OTH_RATIO = OTH_RATIO,
+    CD_TOT_RATIO = TOT_RATIO
+  ) %>%
+  mutate(ZIP = str_pad(as.character(ZIP), width = 5, pad = "0"))
+
+print(ZIP_to_CD_df)
+```
+```{r}
+# Read the Excel file and ensure all columns are read as text otherwise leading zeroes in ZIP will be cut
+FULL_ZIPS <- read_excel(paste0(path_set, '/Data/Full_Zips.xlsx'), col_types = "text")
+
+FULL_ZIPS <- FULL_ZIPS %>%
+  rename(
+    ZIP = `DELIVERY ZIPCODE`,
+    USPS_STATE = `PHYSICAL STATE`
+  )
+
+FULL_ZIPS <- FULL_ZIPS[, c("ZIP", "USPS_STATE", "TYPE")]
+
+# Remove duplicate ZIP codes and clean the data
+FULL_ZIPS <- FULL_ZIPS %>%
+  distinct(ZIP, .keep_all = TRUE) %>%
+  mutate(ZIP = str_pad(ZIP, width = 5, pad = "0")) %>%
+  filter(!is.na(USPS_STATE)) %>%
+  filter(!USPS_STATE %in% c("VI", "PR", "MH", "MP", "FM", "GU")) %>%
+  filter(!TYPE %in% c("Other", "Unique")) %>%
+  arrange(ZIP) %>%
+  ungroup()
+
+print(nrow(FULL_ZIPS))
+print(head(FULL_ZIPS))
+```
+After merging, I find that many of the Alaska ZIP codes aren't getting matched. Since there's only one CD in Alaska, I'll fill in any Alaska state ZIP with 0200.
+This data will not match PO boxes. Most non matches are coming from PO boxes.
+```{r}
+ZIP_FEATURES <- left_join(FULL_ZIPS, ZIP_to_CD_df, by = "ZIP")
+
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  mutate(
+    CD = ifelse(USPS_STATE == "AK", "0200", CD),
+    CD_TOT_RATIO = ifelse(USPS_STATE == "AK", 1.0, CD_TOT_RATIO),
+    CD = ifelse(ZIP == "15253", "4212", CD)
+  )
+
+# the resulting dataframe is a ZIP code matches to CD
+print(ZIP_FEATURES)
+```
+For now, I will assign a ZIP code to whatever whatever County it falls mostly under residential
+We will run this as an outer match because then we can keep zip codes from the right side that aren't in the left side
+```{r}
+ZIP_to_County_df <- read_excel(paste0(path_set, '/Data/ZIP_COUNTY_062020_HUD.xlsx'), col_types = "text")
+
+# Ensure COUNTY and ZIP columns are strings with zero padding
+ZIP_to_County_df <- ZIP_to_County_df %>%
+  mutate(
+    COUNTY = str_pad(COUNTY, width = 5, pad = "0"),
+    ZIP = str_pad(ZIP, width = 5, pad = "0")
+  )
+
+print(head(ZIP_to_County_df))
+
+ZIP_FEATURES <- full_join(ZIP_FEATURES, ZIP_to_County_df, by = "ZIP")
+
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  arrange(desc(RES_RATIO)) %>%
+  distinct(ZIP, .keep_all = TRUE)
+
+ZIP_to_County_df <- ZIP_to_County_df %>%
+  rename(
+    COUNTY_RES_RATIO = RES_RATIO,
+    COUNTY_BUS_RATIO = BUS_RATIO,
+    COUNTY_OTH_RATIO = OTH_RATIO,
+    COUNTY_TOT_RATIO = TOT_RATIO
+  )
+
+#the resulting DF now matches zip codes to county
+print(head(ZIP_FEATURES))
+
+# Count the number of missing values in the COUNTY column and calculate the percentage
+missing_count <- sum(is.na(ZIP_FEATURES$COUNTY))
+missing_percentage <- mean(is.na(ZIP_FEATURES$COUNTY)) * 100
+
+print(missing_count)  
+print(missing_percentage) # High level of match
+print(nrow(ZIP_FEATURES))
+```
+```{r}
+CD_df <- read_csv(paste0(path_set, '/data/House_Reps_District.csv'), col_types = cols(
+  FIPS_Code = col_character(),
+  District = col_character(),
+  CD = col_character(),
+  .default = col_guess()  # Guess the types of the remaining columns
+))
+CD_df
+```
+
+
+```{r}
+# Ensure the 'CD' column is a character in both dataframes
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  mutate(CD = as.character(CD))
+
+CD_df <- CD_df %>%
+  mutate(CD = as.character(CD))
+
+# Merge ZIP_FEATURES with CD_df using a left join on 'CD'
+ZIP_FEATURES <- left_join(ZIP_FEATURES, CD_df, by = "CD")
+
+# Rename columns in ZIP_FEATURES
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  rename(
+    COUNTY_FIPS = COUNTY,
+    CONGRESSPERSON = Name,
+    STATE = State,
+    CONGRESSPERSON_PARTY = Party
+  )
+
+cols_to_move <- colnames(ZIP_FEATURES)[3:5]
+other_cols <- colnames(ZIP_FEATURES)[!(colnames(ZIP_FEATURES) %in% cols_to_move)]
+ZIP_FEATURES <- ZIP_FEATURES[, c(other_cols, cols_to_move)]
+
+ZIP_FEATURES
+```
+```{r}
+mask_mandates_count <- read_excel(paste0(path_set, '/data/county_mask_mandate_data.xlsx'), col_types = c("text"))
+
+mask_mandates_count <- mask_mandates_count %>%
+  select(county_fips, county_conditions, state_conditions)
+
+mask_mandates_count <- mask_mandates_count %>%
+  mutate(county_fips = str_pad(county_fips, width = 5, pad = "0"))
+
+mask_mandates_count <- mask_mandates_count %>%
+  mutate(county_conditions = ifelse(is.na(county_conditions) & !is.na(state_conditions), state_conditions, county_conditions)) %>%
+  mutate(county_conditions = ifelse(is.na(county_conditions), "no mandate", county_conditions))
+
+mask_mandates_count <- mask_mandates_count %>%
+  rename(COUNTY_FIPS = county_fips)
+
+print(head(mask_mandates_count))
+
+ZIP_FEATURES <- left_join(ZIP_FEATURES, mask_mandates_count, by = "COUNTY_FIPS")
+
+ZIP_FEATURES
+```
+I have a pretty decent match rate of 95%. I believe most of these will be from DC.
+
+```{r}
+num_missing_congressperson <- sum(is.na(ZIP_FEATURES$CONGRESSPERSON))
+perc_missing_congressperson <- mean(is.na(ZIP_FEATURES$CONGRESSPERSON)) * 100
+
+cat("Number of missing values in CONGRESSPERSON:", num_missing_congressperson, "\n")
+cat("Percentage of missing values in CONGRESSPERSON:", perc_missing_congressperson, "%\n")
+
+num_missing_county_conditions <- sum(is.na(ZIP_FEATURES$county_conditions))
+perc_missing_county_conditions <- mean(is.na(ZIP_FEATURES$county_conditions)) * 100
+
+cat("Number of missing values in county_conditions:", num_missing_county_conditions, "\n")
+cat("Percentage of missing values in county_conditions:", perc_missing_county_conditions, "%\n")
+```
+# =============================================================================
+# 3. COVID-19 DATA PROCESSING
+# =============================================================================
+
+# Below, we need to add a leading "0" to the FIPS code (FIPS codes are all 5 digits)
+# These are cumulative mortality numbers (not weekly)
+```{r covid_setup}
+usafacts_deaths <- read_csv(paste0(path_set, '/data/Partisanship and Health Behavior/Data/covid_deaths_usafacts.csv'), col_types = cols(
+  countyFIPS = col_character()
+))
+
+usafacts_deaths <- usafacts_deaths %>%
+  mutate(countyFIPS = str_pad(countyFIPS, width = 5, pad = "0"))
+```
+For this preliminary analysis, I will only use wave 2,4,6.
+Each wave's data was collected on 2020-06-17 - 2020-06-23, 2020-11-29 - 2020-12-16, 2021-05-12 - 2021-05-25.
+I will take covid mortality from the midpoint of the wave range.
+Wave 2 = 6/18-24. 2020
+Wave 3 = 9/12-20, 2020
+Wave 4 = 12/1-7, 2020
+Wave 5 = 2/9-14, 2021
+Wave 6 = 5/14-25, 2021
+
+```{r}
+usafacts_deaths <- read_csv(paste0(path_set, '/Data/Partisanship and Health Behavior/Data/covid_deaths_usafacts.csv'), col_types = cols(
+  countyFIPS = col_character()
+))
+
+usafacts_deaths <- usafacts_deaths %>%
+  mutate(countyFIPS = str_pad(countyFIPS, width = 5, pad = "0"))
+
+# Define the columns to keep
+columns_to_keep <- c('countyFIPS', 'County Name',
+                     '2020-06-01', '2020-06-15', '2020-06-13', '2020-06-20', # w2
+                     '2020-09-01', '2020-09-16', '2020-09-09', '2020-09-05', # w3
+                     '2020-12-05', '2020-12-04', '2020-12-01', '2020-11-28', # w4
+                     '2021-02-12', '2021-02-10', '2021-02-05', '2021-01-29', # w5
+                     '2021-05-19', '2021-05-17', '2021-05-12', '2021-05-05') # w6
+
+usafacts_deaths <- usafacts_deaths %>%
+  select(all_of(columns_to_keep))
+
+new_column_names <- ifelse(seq_along(columns_to_keep) <= 2, columns_to_keep, 
+                           paste0('COUNTY_COV_DEATHS_', gsub('-', '_', columns_to_keep)))
+
+colnames(usafacts_deaths) <- new_column_names
+
+usafacts_deaths <- usafacts_deaths %>%
+  rename(COUNTY_FIPS = countyFIPS)
+
+print(head(usafacts_deaths))
+```
+Nearly all ZIP codes get a match (just over 1 percent don't get matched).
+If we end up going back to mortality rates (as of now (01/14/24) we're using prevalence rates.
+```{r}
+ZIP_FEATURES <- left_join(ZIP_FEATURES, usafacts_deaths, by = "COUNTY_FIPS")
+
+num_missing_cov_deaths <- sum(is.na(ZIP_FEATURES$COUNTY_COV_DEATHS_2020_06_01))
+perc_missing_cov_deaths <- mean(is.na(ZIP_FEATURES$COUNTY_COV_DEATHS_2020_06_01)) * 100
+
+cat("Number of missing values in COUNTY_COV_DEATHS_2020_06_01:", num_missing_cov_deaths, "\n")
+cat("Percentage of missing values in COUNTY_COV_DEATHS_2020_06_01:", perc_missing_cov_deaths, "%\n")
+```
+```{r}
+census_pop <- read_csv(paste0(path_set, '/Data/Partisanship and Health Behavior/Data/co-est2021-alldata.csv'), 
+                       col_types = cols(
+                         STATE = col_character(),
+                         COUNTY = col_character(),
+                         .default = col_guess()
+                       ), 
+                       locale = locale(encoding = 'ISO-8859-1'))
+
+census_pop_FIPS <- read_excel(paste0(path_set, '/Data/Partisanship and Health Behavior/Data/all-geocodes-v2020.xlsx'), col_types = c("text"))
+
+census_pop_FIPS <- census_pop_FIPS %>%
+  rename(CTYNAME = `Area Name (including legal/statistical area description)`)
+
+census_pop <- census_pop %>%
+  mutate(COUNTY_FIPS = str_c(STATE, COUNTY))
+
+State_FIPS_Crosswalk <- census_pop %>%
+  select(STATE, STNAME) %>%
+  mutate(STATE_FIPS = as.character(STATE)) %>%
+  mutate(STATE = STNAME) %>%
+  select(-STNAME) %>%
+  distinct(STATE, .keep_all = TRUE) %>%
+  filter(!is.na(STATE))
+
+write_csv(State_FIPS_Crosswalk, paste0(path_set, '/data/STATE_FIPS_CROSSWALK.csv'))
+write_csv(State_FIPS_Crosswalk, paste0(path_set, '/Data/Partisanship and Health Behavior/Data/STATE_FIPS_CROSSWALK.csv'))
+
+columns_to_keep <- c('STATE', 'POPESTIMATE2020', 'DEATHS2020', 'POPESTIMATE2021', 'DEATHS2021', 'COUNTY_FIPS')
+census_pop <- census_pop %>%
+  select(all_of(columns_to_keep)) %>%
+  rename(STATE_FIPS = STATE)
+
+census_pop
+State_FIPS_Crosswalk
+```
+A crude mortality rate, not standardized or age adjusted, for this preliminary analysis
+I manually insert Puerto Rico' State FIPS code and District of Columbia to make this a clean merge across the board.
+```{r}
+ZIP_FEATURES <- left_join(ZIP_FEATURES, census_pop, by = "COUNTY_FIPS")
+
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  mutate(
+    COV_County_CMR_2020_06_20 = (COUNTY_COV_DEATHS_2020_06_20 / POPESTIMATE2020) * 1000,
+    COV_County_CMR_2020_12_09 = (COUNTY_COV_DEATHS_2020_12_05 / POPESTIMATE2020) * 1000,
+    COV_County_CMR_2021_05_19 = (COUNTY_COV_DEATHS_2021_05_19 / POPESTIMATE2021) * 1000,
+    STATE_FIPS = if_else(STATE == "Puerto Rico", "72", STATE_FIPS)
+  )
+
+num_missing_cmr_2020_06_20 <- sum(is.na(ZIP_FEATURES$COV_County_CMR_2020_06_20))
+perc_missing_cmr_2020_06_20 <- mean(is.na(ZIP_FEATURES$COV_County_CMR_2020_06_20)) * 100
+
+cat("Number of missing values in COV_County_CMR_2020_06_20:", num_missing_cmr_2020_06_20, "\n")
+cat("Percentage of missing values in COV_County_CMR_2020_06_20:", perc_missing_cmr_2020_06_20, "%\n")
+```
+We have decided that prevalence is a better measure for predicting contact behavior than mortality
+I want these lags
+Wave 2 (6/18-24, 2020), midpoint: 06/21/2020, lag1: 06/14/2020, lag3: 06/07/2020
+Wave 3 (9/12-20, 2020), midpoint: 09/16/2020, lag1: 09/09/2020, lag3: 09/02/2020
+Wave 4 (12/1-7, 2020), midpoint: 12/04/2020, lag1: 11/27/2020, lag3: 11/20/2020
+Wave 5 (2/9-14, 2021), midpoint: 02/11/2021, lag: 02/04/2021, lag3: 01/28/2021
+Wave 6 (5/14-25, 2021), midpoint: 05/19/2021, lag: 05/12/2021, lag3: 05/05/2021
+```{r covid_incidence}
+# Wave 1 (Early 2020)
+prevalence_early_2020 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/incidence/time_series_covid19_confirmed_US_early_2020.csv'),
+  dates = c('4/15/20', '4/10/20', '4/7/20', '4/4/20'),
+  extra_dates = c('4/3/20'),
+  wave_num = "1",
+  output_path = paste0(path_set, '/data/incidence/wave_1_incidence.csv'),
+  type = "incidence"
+)
+
+# Wave 2 (Mid 2020)
+prevalence_mid_2020 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/incidence/time_series_covid19_confirmed_US_mid_2020.csv'),
+  dates = c('6/21/20', '6/14/20', '6/14/20', '6/7/20'),
+  extra_dates = c('6/18/20'),
+  wave_num = "2",
+  output_path = paste0(path_set, '/data/incidence/wave_2_incidence.csv'),
+  type = "incidence"
+)
+
+# Wave 3 (Late 2020)
+prevalence_late_2020 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/incidence/time_series_covid19_confirmed_US_late_2020.csv'),
+  dates = c('9/16/20', '9/9/20', '9/9/20', '9/2/20'),
+  extra_dates = c('9/12/20'),
+  wave_num = "3",
+  output_path = paste0(path_set, '/data/incidence/wave_3_incidence.csv'),
+  type = "incidence"
+)
+
+# Wave 4 (Early 2021)
+prevalence_early_2021 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/incidence/time_series_covid19_confirmed_US_early_2021.csv'),
+  dates = c('12/4/20', '11/27/20', '11/27/20', '11/20/20'),
+  extra_dates = c('12/1/20'),
+  wave_num = "4",
+  output_path = paste0(path_set, '/data/incidence/wave_4_incidence.csv'),
+  type = "incidence"
+)
+
+# Wave 5 (Mid 2021)
+prevalence_mid_2021 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/incidence/time_series_covid19_confirmed_US_mid_2021.csv'),
+  dates = c('2/11/21', '2/4/21', '2/4/21', '1/28/21'),
+  extra_dates = c('2/9/21'),
+  wave_num = "5",
+  output_path = paste0(path_set, '/data/incidence/wave_5_incidence.csv'),
+  type = "incidence"
+)
+
+# Wave 6 (Mid 2021 - 2)
+prevalence_mid_2021_2 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/incidence/time_series_covid19_confirmed_US_mid_2021.csv'),
+  dates = c('5/19/21', '5/12/21', '5/12/21', '5/5/21'),
+  extra_dates = c('5/14/21'),
+  wave_num = "6",
+  output_path = paste0(path_set, '/data/incidence/wave_6_incidence.csv'),
+  type = "incidence"
+)
+
+# Combine all prevalence data into one dataframe
+prevalence <- prevalence_early_2020 %>% 
+  left_join(prevalence_mid_2020, by = "FIPS") %>%
+  left_join(prevalence_late_2020, by = "FIPS") %>%
+  left_join(prevalence_early_2021, by = "FIPS") %>%
+  left_join(prevalence_mid_2021, by = "FIPS") %>%
+  left_join(prevalence_mid_2021_2, by = "FIPS") %>%
+  distinct(FIPS, .keep_all = TRUE)
+
+# Rename columns to prepend 'prev_' to all columns except the first (FIPS)
+colnames(prevalence) <- ifelse(seq_along(colnames(prevalence)) == 1, colnames(prevalence), paste0('prev_', colnames(prevalence)))
+
+# Rename 'FIPS' to 'COUNTY_FIPS'
+prevalence <- prevalence %>%
+  rename(COUNTY_FIPS = FIPS) %>% 
+  filter(!is.na(COUNTY_FIPS))
+
+prevalence
+```
+Next, I want to create the weekly incidence for each key date
+
+#06/21/2020 - 06/14/2020 prevalence['wave_2_incidence'] = prevalence['prev_6/21/20'] - prevalence['prev_6/14/20'] #09/16/2020 - 09/09/2020 prevalence['wave_3_incidence'] = prevalence['prev_9/16/20'] - prevalence['prev_9/9/20'] #12/04/2020 - 11/27/2020 prevalence['wave_4_incidence'] = prevalence['prev_12/4/20'] - prevalence['prev_11/27/20'] #02/11/2021 - 02/04/2021 prevalence['wave_5_incidence'] = prevalence['prev_2/11/21'] - prevalence['prev_2/4/21'] #05/19/2021 - 05/12/2021 prevalence['wave_6_incidence'] = prevalence['prev_5/19/21'] - prevalence['prev_5/12/21']
+
+below we turn these figures into rates based on population
+```{r}
+ZIP_FEATURES <- left_join(ZIP_FEATURES, prevalence, by = "COUNTY_FIPS")
+
+# Loop through the columns of ZIP_FEATURES
+for (col in colnames(ZIP_FEATURES)) {
+  # Check if the column name starts with 'prev_'
+  if (startsWith(col, 'prev_')) {
+    # Extract the date part of the column name
+    date_part <- str_replace(col, 'prev_', '')
+    # Perform the calculation and create a new column
+    ZIP_FEATURES <- ZIP_FEATURES %>%
+      mutate(!!paste0('rate_prev_', date_part) := (get(col) / POPESTIMATE2020) * 1000)
+  }
+}
+
+# Drop the prevalence columns from ZIP_FEATURES
+prev_columns <- setdiff(colnames(prevalence), "COUNTY_FIPS")
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  select(-all_of(prev_columns))
+
+# Count and print the number and percentage of missing values in the 'rate_prev_11/27/20' column
+num_missing_rate_prev <- sum(is.na(ZIP_FEATURES$`rate_prev_11/27/20`))
+perc_missing_rate_prev <- mean(is.na(ZIP_FEATURES$`rate_prev_11/27/20`)) * 100
+
+cat("Number of missing values in rate_prev_11_27_20:", num_missing_rate_prev, "\n")
+cat("Percentage of missing values in rate_prev_11_27_20:", perc_missing_rate_prev, "%\n")
+
+print(nrow(ZIP_FEATURES))
+```
+Next, I want to follow the same steps from above using mortality data
+```{r covid_mortality}
+# Wave 1 (Early 2020)
+mortality_early_2020 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/mortality/time_series_covid19_deaths_US_04_20.csv'),
+  dates = c('4/15/20', '4/10/20', '4/7/20', '4/4/20'),
+  extra_dates = c('4/3/20'),
+  wave_num = "1",
+  output_path = paste0(path_set, '/data/mortality/wave_1_mortality.csv'),
+  type = "mortality"
+)
+
+# Wave 2 (Mid 2020)
+mortality_mid_2020 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/mortality/time_series_covid19_deaths_US_09_20.csv'),
+  dates = c('6/21/20', '6/14/20', '6/14/20', '6/7/20'),
+  extra_dates = c('6/18/20'),
+  wave_num = "2",
+  output_path = paste0(path_set, '/data/mortality/wave_2_mortality.csv'),
+  type = "mortality"
+)
+
+# Wave 3 (Late 2020)
+mortality_late_2020 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/mortality/time_series_covid19_deaths_US_09_20.csv'),
+  dates = c('9/16/20', '9/9/20', '9/9/20', '9/2/20'),
+  extra_dates = c('9/12/20'),
+  wave_num = "3",
+  output_path = paste0(path_set, '/data/mortality/wave_3_mortality.csv'),
+  type = "mortality"
+)
+
+# Wave 4 (Early 2021)
+mortality_early_2021 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/mortality/time_series_covid19_deaths_US_12_20.csv'),
+  dates = c('12/4/20', '11/27/20', '11/27/20', '11/20/20'),
+  extra_dates = c('12/1/20'),
+  wave_num = "4",
+  output_path = paste0(path_set, '/data/mortality/wave_4_mortality.csv'),
+  type = "mortality"
+)
+
+# Wave 5 (Mid 2021)
+mortality_mid_2021 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/mortality/time_series_covid19_deaths_US_02_21.csv'),
+  dates = c('2/11/21', '2/4/21', '2/4/21', '1/28/21'),
+  extra_dates = c('2/9/21'),
+  wave_num = "5",
+  output_path = paste0(path_set, '/data/mortality/wave_5_mortality.csv'),
+  type = "mortality"
+)
+
+# Wave 6 (Mid 2021 - 2)
+mortality_mid_2021_2 <- process_covid_wave(
+  file_path = paste0(path_set, '/data/mortality/time_series_covid19_deaths_US_05_21.csv'),
+  dates = c('5/19/21', '5/12/21', '5/12/21', '5/5/21'),
+  extra_dates = c('5/14/21'),
+  wave_num = "6",
+  output_path = paste0(path_set, '/data/mortality/wave_6_mortality.csv'),
+  type = "mortality"
+)
+
+# Combine all mortality data into one dataframe
+mortality <- mortality_early_2020 %>% 
+  left_join(mortality_mid_2020, by = "FIPS") %>%
+  left_join(mortality_late_2020, by = "FIPS") %>%
+  left_join(mortality_early_2021, by = "FIPS") %>%
+  left_join(mortality_mid_2021, by = "FIPS") %>%
+  left_join(mortality_mid_2021_2, by = "FIPS")
+
+# Rename columns to prepend 'prev_' to all columns except the first (FIPS)
+colnames(mortality) <- ifelse(seq_along(colnames(mortality)) == 1, colnames(mortality), paste0('mort_', colnames(mortality)))
+
+# Rename 'FIPS' to 'COUNTY_FIPS'
+mortality <- mortality %>%
+  rename(COUNTY_FIPS = FIPS) %>% 
+  filter(!is.na(COUNTY_FIPS))
+
+mortality
+```
+```{r}
+ZIP_FEATURES <- left_join(ZIP_FEATURES, mortality, by = "COUNTY_FIPS")
+
+# Loop through the columns of ZIP_FEATURES
+for (col in colnames(ZIP_FEATURES)) {
+  # Check if the column name starts with 'prev_'
+  if (startsWith(col, 'mort_')) {
+    # Extract the date part of the column name
+    date_part <- str_replace(col, 'mort_', '')
+    # Perform the calculation and create a new column
+    ZIP_FEATURES <- ZIP_FEATURES %>%
+      mutate(!!paste0('rate_mort_', date_part) := (get(col) / POPESTIMATE2020) * 1000)
+  }
+}
+
+# Drop the mortality columns from ZIP_FEATURES
+prev_columns <- setdiff(colnames(mortality), "COUNTY_FIPS")
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  select(-all_of(prev_columns))
+
+# Count and print the number and percentage of missing values in the 'rate_prev_11/27/20' column
+num_missing_rate_prev <- sum(is.na(ZIP_FEATURES$`rate_mort_11/27/20`))
+perc_missing_rate_prev <- mean(is.na(ZIP_FEATURES$`rate_mort_11/27/20`)) * 100
+
+cat("Number of missing values in mort_prev_11_27_20:", num_missing_rate_prev, "\n")
+cat("Percentage of missing values in mort_prev_11_27_20:", perc_missing_rate_prev, "%\n")
+
+print(nrow(ZIP_FEATURES))
+```
+These variables should be logged so that they fit better with a linear model
+using log1p for handling zeros
+```{r}
+
+ZIP_FEATURES <- ZIP_FEATURES %>% 
+  mutate(log_rate_prev_4_15_20 = log(`rate_prev_4/15/20`+ 1),
+         log_rate_prev_12_01_20 = log(`rate_prev_12/1/20`+ 1),
+         log_rate_prev_6_14_20 = log(`rate_prev_6/14/20`+1),
+         log_rate_prev_9_9_20 = log(`rate_prev_9/9/20`+1),
+         log_rate_prev_2_4_21 = log(`rate_prev_2/4/21`+1),
+         log_rate_prev_5_12_21 = log(`rate_prev_5/12/21`+1))  #
+
+ZIP_FEATURES <- ZIP_FEATURES %>% 
+  mutate(log_rate_mort_4_15_20 = log(`rate_mort_4/15/20`+ 1),
+    log_rate_mort_12_01_20 = log(`rate_mort_12/1/20`+ 1),
+         log_rate_mort_6_14_20 = log(`rate_mort_6/14/20`+1),
+         log_rate_mort_9_9_20 = log(`rate_mort_9/9/20`+1),
+         log_rate_mort_2_4_21 = log(`rate_mort_2/4/21`+1),
+         log_rate_mort_5_12_21 = log(`rate_mort_5/12/21`+1))  #
+
+ZIP_FEATURES <- ZIP_FEATURES %>% 
+  mutate(log_rate_mort_12_01_20 = log(`rate_mort_12/1/20`+ 1),
+         log_rate_mort_6_14_20 = log(`rate_mort_6/14/20`+1),
+         log_rate_mort_9_9_20 = log(`rate_mort_9/9/20`+1),
+         log_rate_mort_2_4_21 = log(`rate_mort_2/4/21`+1),
+         log_rate_mort_5_12_21 = log(`rate_mort_5/12/21`+1))  #
+```
+Lastly, we decided that instead of cumilative cases we want the new cases from the week prior. 
+First, I'll read in the incidence data.
+Second, I'll create variables to match on.
+Third, I'll merge. 
+
+
+# =============================================================================
+# 4. ADDITIONAL FEATURES
+# =============================================================================
+
+# Below I insert data on urbanicity
+```{r}
+columns_to_keep <- c("FIPS", "RUCC_2013")
+
+# Define the column types
+col_types <- cols(
+  FIPS = col_character()
+)
+
+# Read the CSV file
+RUC_county_df <- read_csv('../Data/Partisanship and Health Behavior/Data/ruralurbancodes2013.csv', col_types = col_types)
+
+# Keep only the specified columns
+RUC_county_df <- RUC_county_df %>% select(all_of(columns_to_keep))
+
+RUC_county_df <- filter(RUC_county_df, !is.na(FIPS))
+
+# Rename the columns
+RUC_county_df <- RUC_county_df %>%
+  rename(
+    COUNTY_RUCC_2013 = RUCC_2013,
+    COUNTY_FIPS = FIPS
+  )
+
+# Ensure COUNTY_FIPS is of type character (string)
+RUC_county_df <- RUC_county_df %>%
+  mutate(COUNTY_FIPS = as.character(COUNTY_FIPS))
+
+# Assuming ZIP_FEATURES is already loaded in your environment
+# Perform the left join
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  left_join(RUC_county_df, by = "COUNTY_FIPS")
+
+print(nrow(ZIP_FEATURES))
+```
+Next, I want to control for the severity of the lockdowns according to Oxford's tracker
+```{r}
+State_Restrictions_df <- read_csv(
+  '../Data/Partisanship and Health Behavior/Data/OxCGRT_USA_differentiated_withnotes_2020.csv',
+  col_types = cols(.default = col_character()),
+  show_col_types = FALSE
+)
+
+# Ensure the 'Date' column is of type character (string)
+State_Restrictions_df <- State_Restrictions_df %>%
+  mutate(Date = as.character(Date))
+
+# Filter rows where 'Date' is either '20200617' or '20201129'
+State_Restrictions_df <- State_Restrictions_df %>%
+  filter(Date %in% c('20200617', '20201129'))
+
+# Define the columns to keep
+columns_to_keep <- c('RegionName', 'GovernmentResponseIndex_SimpleAverage', 'Date')
+
+# Keep only the specified columns
+State_Restrictions_df <- State_Restrictions_df %>%
+  select(all_of(columns_to_keep))
+
+# Rename the columns
+State_Restrictions_df <- State_Restrictions_df %>%
+  rename(
+    STATE = RegionName,
+    State_Government_Response_Index = GovernmentResponseIndex_SimpleAverage
+  )
+
+State_Restrictions_df$State_Government_Response_Index <- as.numeric(State_Restrictions_df$State_Government_Response_Index)
+
+print(State_Restrictions_df)
+```
+```{r}
+# Create 'State_Government_Response_Index_06172020' column
+State_Restrictions_df <- State_Restrictions_df %>%
+  mutate(State_Government_Response_Index_06172020 = ifelse(Date == "20200617", State_Government_Response_Index, "0"))
+
+# Update 'State_Government_Response_Index_06172020' column
+State_Restrictions_df <- State_Restrictions_df %>%
+  mutate(State_Government_Response_Index_06172020 = ifelse(State_Government_Response_Index_06172020 == "0", State_Government_Response_Index, State_Government_Response_Index_06172020))
+
+State_Restrictions_06172020 <- State_Restrictions_df %>%
+  filter(Date == "20200617") %>% 
+  select(STATE, State_Government_Response_Index_06172020)
+
+# Create 'State_Government_Response_Index_11192020' column
+State_Restrictions_df <- State_Restrictions_df %>%
+  mutate(State_Government_Response_Index_11192020 = ifelse(Date == "20201129", State_Government_Response_Index, "0"))
+
+# Update 'State_Government_Response_Index_11192020' column
+State_Restrictions_df <- State_Restrictions_df %>%
+  mutate(State_Government_Response_Index_11192020 = ifelse(State_Government_Response_Index_11192020 == "0", State_Government_Response_Index, State_Government_Response_Index_11192020))
+
+State_Restrictions_11192020 <- State_Restrictions_df %>%
+  filter(Date == "20201129") %>% 
+  select(STATE, State_Government_Response_Index_11192020)
+
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  left_join(State_Restrictions_11192020, by = "STATE")
+
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  left_join(State_Restrictions_06172020, by = "STATE")
+
+# Display the resulting data frame
+print(ZIP_FEATURES)
+```
+Next, I want to read in the county level presidential data and generate two variables \
+
+For which president did the county overall vote for?
+What percentage of the county voted for which president?
+note: I manually added in DC because it was not in the dataset
+```{r}
+col_types <- cols(
+  county_fips = col_character()
+)
+county_pres <- read_csv('../Data/Partisanship and Health Behavior/Data/countypres_2000-2020.csv', col_types = col_types)
+
+# Filter rows for the year 2020
+county_pres <- county_pres %>%
+  filter(year == 2020) %>%
+  mutate(party_fips = paste0(party, county_fips))
+
+# Group by 'party_fips' and sum 'candidatevotes'
+total_votes_by_party <- county_pres %>%
+  group_by(party_fips) %>%
+  summarize(total_candidatevotes = sum(candidatevotes, na.rm = TRUE)) %>%
+  ungroup()
+
+# Merge total votes by party back into the original data frame
+county_pres <- county_pres %>%
+  left_join(total_votes_by_party, by = "party_fips")
+
+# Calculate the percentage of votes won
+county_pres <- county_pres %>%
+  mutate(percentage_won = (total_candidatevotes / totalvotes) * 100)
+
+# Find the row with the maximum 'percentage_won' for each 'county_fips'
+county_pres_wide <- county_pres %>%
+  group_by(county_fips) %>%
+  slice_max(percentage_won, with_ties = FALSE) %>%
+  ungroup()
+
+# Rename columns
+county_pres_wide <- county_pres_wide %>%
+  rename(
+    winning_pres_candidate = candidate,
+    winning_pres_party = party,
+    winning_pres_candidate_percentage = percentage_won
+  )
+
+# Merge in the Democrats' data
+dem_county_pres <- county_pres %>%
+  filter(party == "DEMOCRAT") %>%
+  rename(biden_percentage_won = percentage_won) %>%
+  select(biden_percentage_won, county_fips)
+
+county_pres_wide <- county_pres_wide %>%
+  left_join(dem_county_pres, by = "county_fips")
+
+# Merge in the Republicans' data
+rep_county_pres <- county_pres %>%
+  filter(party == "REPUBLICAN") %>%
+  rename(trump_percentage_won = percentage_won) %>%
+  select(trump_percentage_won, county_fips)
+
+county_pres_wide <- county_pres_wide %>%
+  left_join(rep_county_pres, by = "county_fips")
+
+# Keep only the desired columns
+county_pres_wide <- county_pres_wide %>%
+  select(-year, -state, -state_po, -county_name, -office, -candidatevotes, -totalvotes, -version, -mode, -party_fips)
+
+county_pres_wide <- filter(county_pres_wide, !is.na(county_pres_wide$county_fips))
+
+print(county_pres_wide)
+
+county_pres_wide <- county_pres_wide %>%
+  rename(COUNTY_FIPS = county_fips)
+
+# Perform the left join
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  left_join(county_pres_wide, by = "COUNTY_FIPS")
+
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  distinct(ZIP, .keep_all = TRUE)
+
+print(ZIP_FEATURES)
+```
+Next, for the sake of consistency, I want to get data on the percentage of the CD that was won by a democrat and Republican, respectively.
+
+However, I need a clean crosswalk (as this one is pulling out several duplicates)
+```{r}
+county_CD_share <- read_excel('../Data/Partisanship and Health Behavior/Data/federalelections2020.xlsx', 
+                              sheet = '13_US_House_Results_State',
+                              col_types = c(DISTRICT = "text"))
+
+# Rename the column 'DISTRICT' to 'CD_DISTRICT'
+county_CD_share <- county_CD_share %>%
+  rename(CD_DISTRICT = DISTRICT)
+
+# Filter rows where 'GENERAL %' is not NA
+county_CD_share <- county_CD_share %>%
+  filter(!is.na(`GENERAL %`))
+
+# Assuming State_FIPS_Crosswalk is already loaded
+# Merge with State_FIPS_Crosswalk
+county_CD_share <- county_CD_share %>%
+  left_join(State_FIPS_Crosswalk, by = "STATE")
+
+# Ensure 'STATE_FIPS' and 'CD_DISTRICT' are character
+county_CD_share <- county_CD_share %>%
+  mutate(
+    STATE_FIPS = as.character(STATE_FIPS),
+    CD_DISTRICT = as.character(CD_DISTRICT)
+  )
+
+# Add leading zero if necessary
+county_CD_share <- county_CD_share %>%
+  mutate(
+    STATE_FIPS = ifelse(nchar(STATE_FIPS) == 1, paste0("0", STATE_FIPS), STATE_FIPS),
+    CD_DISTRICT = ifelse(nchar(CD_DISTRICT) == 1, paste0("0", CD_DISTRICT), CD_DISTRICT)
+  )
+
+# Create 'CD' column
+county_CD_share <- county_CD_share %>%
+  mutate(CD = paste0(STATE_FIPS, CD_DISTRICT))
+
+# Write to CSV
+write.csv(county_CD_share, '../data/CD_COUNTY_PERCENT_WON.csv', row.names = FALSE)
+
+# Filter for Democratic and Republican parties
+D_county_CD_share <- county_CD_share %>%
+  filter(grepl("D", PARTY)) %>%
+  select(`GENERAL %`, CD) %>%
+  rename(CD_PERCENT_DEMOCRAT = `GENERAL %`)
+
+R_county_CD_share <- county_CD_share %>%
+  filter(grepl("R", PARTY)) %>%
+  select(`GENERAL %`, CD) %>%
+  rename(CD_PERCENT_REPUBLICAN = `GENERAL %`)
+
+# Remove rows where 'CD' is NA
+D_county_CD_share <- D_county_CD_share %>%
+  filter(!is.na(CD))
+
+R_county_CD_share <- R_county_CD_share %>%
+  filter(!is.na(CD))
+
+# Merge with ZIP_FEATURES
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  left_join(D_county_CD_share, by = "CD") %>%
+  left_join(R_county_CD_share, by = "CD")
+
+# Print the number and percentage of NA values in 'CD_PERCENT_REPUBLICAN'
+print(sum(is.na(ZIP_FEATURES$CD_PERCENT_REPUBLICAN)))
+print(mean(is.na(ZIP_FEATURES$CD_PERCENT_REPUBLICAN)) * 100)
+
+# Manually adjust rows
+ZIP_FEATURES <- ZIP_FEATURES %>%
+  mutate(CD_PERCENT_REPUBLICAN = ifelse(!is.na(CD_PERCENT_DEMOCRAT) & is.na(CD_PERCENT_REPUBLICAN), 0, CD_PERCENT_REPUBLICAN),
+         CD_PERCENT_DEMOCRAT = ifelse(CD_PERCENT_REPUBLICAN != 0 & !is.na(CD_PERCENT_REPUBLICAN) & is.na(CD_PERCENT_DEMOCRAT), 0, CD_PERCENT_DEMOCRAT),
+         CD = ifelse(CD == "1225", 0, CD),
+         CD = ifelse(CD == "1225", 100, CD))
+
+# Print the number and percentage of NA values in 'CD_PERCENT_REPUBLICAN' again
+print(sum(is.na(ZIP_FEATURES$CD_PERCENT_REPUBLICAN)))
+print(mean(is.na(ZIP_FEATURES$CD_PERCENT_REPUBLICAN)) * 100)
+```
+Next, I want to merge in demographic data by CD
+```{r}
+col_types <- cols(
+  GEO_ID = col_character()
+)
+
+CD_demographics <- read_csv('../data/ACSDP5Y2020.DP05-Data.csv', col_types = col_types, skip = 1)
+
+# Select specific columns
+CD_demographics <- CD_demographics %>%
+  select(
+    Geography,
+    `Geographic Area Name`,
+    `Estimate!!SEX AND AGE!!Total population`,
+    `Estimate!!SEX AND AGE!!Total population!!Female`,
+    `Estimate!!SEX AND AGE!!Total population!!Sex ratio (males per 100 females)`,
+    `Estimate!!SEX AND AGE!!Total population!!Under 5 years`,
+    `Estimate!!SEX AND AGE!!Total population!!65 to 74 years`,
+    `Estimate!!SEX AND AGE!!Total population!!75 to 84 years`,
+    `Estimate!!SEX AND AGE!!Total population!!85 years and over`,
+    `Estimate!!SEX AND AGE!!Total population!!Median age (years)`,
+    `Estimate!!RACE!!Total population`,
+    `Estimate!!RACE!!Total population!!One race!!White`,
+    `Estimate!!RACE!!Total population!!One race!!Black or African American`,
+    `Estimate!!RACE!!Total population!!One race!!American Indian and Alaska Native`,
+    `Estimate!!RACE!!Total population!!One race!!Asian`,
+    `Estimate!!RACE!!Total population!!One race!!Asian!!Asian Indian`,
+    `Margin of Error!!Race alone or in combination with one or more other races!!Total population!!White`,
+    `Estimate!!Race alone or in combination with one or more other races!!Total population!!Black or African American`,
+    `Estimate!!Race alone or in combination with one or more other races!!Total population!!American Indian and Alaska Native`,
+    `Estimate!!Race alone or in combination with one or more other races!!Total population!!Asian`,
+    `Estimate!!HISPANIC OR LATINO AND RACE!!Total population`,
+    `Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Hispanic or Latino (of any race)`,
+    `Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino`,
+    `Percent!!SEX AND AGE!!Total population!!65 years and over...227`,
+    `Percent!!RACE!!Total population!!One race!!White`,
+    `Percent!!RACE!!Total population!!One race!!Black or African American`,
+    `Percent!!RACE!!Total population!!One race!!American Indian and Alaska Native`,
+    `Percent!!RACE!!Total population!!One race!!Asian`,
+    `Percent!!RACE!!Total population!!One race!!Asian!!Asian Indian`,
+    `Percent!!Race alone or in combination with one or more other races!!Total population!!White`,
+    `Percent!!Race alone or in combination with one or more other races!!Total population!!Black or African American`,
+    `Percent!!Race alone or in combination with one or more other races!!Total population!!American Indian and Alaska Native`,
+    `Percent!!Race alone or in combination with one or more other races!!Total population!!Asian`,
+    `Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Hispanic or Latino (of any race)`,
+    `Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino`
+  )
+
+# Display the resulting data frame
+print(CD_demographics)
+```
+```{r}
+write.csv(ZIP_FEATURES, '../data/ZIP_Features.csv', row.names = FALSE)
+```
+
+# =============================================================================
+# 5. BICS SURVEY DATA MERGE
+# =============================================================================
+
+# Now let's merge ZIP_FEATURES to BICS to get a dataset that matches features of the ZIP code to the respondent
+# First, I'll read in the different waves seperately 
+# The two files have the same row count but different columns (225 in manual versus 62 in merged)
+```{r}
+if (file_type == "manual") {
+  df_merged <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/df_all_waves.rds')
+  df_w0 <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/pooled_wave0_unweighted.rds')
+  df_w1 <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_wave1_unweighted.rds')
+  df_w2 <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_wave2_unweighted.rds')
+  df_w3 <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_wave3_unweighted.rds')
+  df_w4 <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_wave4_unweighted.rds')
+  df_w5 <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_wave5_unweighted.rds')
+  df_w6 <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_wave6_unweighted.rds')
+  
+  df_w0 <- df_w0 %>% 
+    #select(-political_party) %>% 
+    #rename(political_party = political_party_coarse_wave0) %>% 
+    mutate(num_cc = as.numeric(num_cc),
+           num_cc_nonhh = as.numeric(ifelse(num_cc_nonhh == "" | is.na(num_cc_nonhh), NA, num_cc_nonhh)),
+           orig_hhsize = case_when(
+      orig_hhsize == "6" ~ "6 or more (please specify)",
+      orig_hhsize == "7" ~ "6 or more (please specify)",
+      orig_hhsize == "8" ~ "6 or more (please specify)",
+      orig_hhsize == "9" ~ "6 or more (please specify)",
+      orig_hhsize == "10 or more (please specify)" ~ "6 or more (please specify)",
+      TRUE ~ orig_hhsize
+    ))
+    #mutate(political_party = case_when(
+      #political_party == "republican" ~ "Republican",
+      #political_party == "democrat" ~ "Democrat",
+      #political_party == "neither/independent" ~ "Independent",
+      #TRUE ~ "Prefer not to answer"
+    #)
+  
+  df_w0 %>%
+  group_by(political_party) %>%
+  summarize(mean_num_cc = mean(num_cc, na.rm = TRUE),
+            n = n())
+  df_w1 %>%
+  group_by(political_party) %>%
+  summarize(mean_num_cc = mean(num_cc, na.rm = TRUE),
+            n = n())
+  
+  df_w2 %>%
+  group_by(political_party) %>%
+  summarize(mean_num_cc = mean(num_cc, na.rm = TRUE),
+            n = n())
+  
+  if("resp_employ" %in% names(df_w1)) {
+  df_w1$resp_employ <- as.character(df_w1$resp_employ)
+  }
+  
+  df_w1 <- df_w1 %>%
+  mutate(data_collected_dates = "April 11-May 5, '20")
+  
+  if("resp_employ" %in% names(df_w2)) {
+  df_w2$resp_employ <- as.character(df_w2$resp_employ)
+  }
+  
+  df_w2 <- df_w2 %>%
+  mutate(data_collected_dates = "June 18-24, '20")
+
+  if("resp_employ" %in% names(df_w3)) {
+  df_w3$resp_employ <- as.character(df_w3$resp_employ)
+  }
+  
+  df_w3 <- df_w3 %>%
+  mutate(data_collected_dates = "September 12-20, '20'")
+
+  if("resp_employ" %in% names(df_w4)) {
+  df_w4$resp_employ <- as.character(df_w4$resp_employ)
+  }
+  
+  df_w4 <- df_w4 %>%
+  mutate(data_collected_dates = "December 1-7, '20'")
+
+  if("resp_employ" %in% names(df_w5)) {
+  df_w5$resp_employ <- as.character(df_w5$resp_employ)
+  }
+  
+  df_w5 <- df_w5 %>%
+  mutate(data_collected_dates = "February 9-14, '21'")
+
+  if("resp_employ" %in% names(df_w6)) {
+  df_w6$resp_employ <- as.character(df_w6$resp_employ)
+  }
+  
+  df_w6 <- df_w6 %>%
+  mutate(data_collected_dates = "May 14-25, '21'")
+
+  df_w2$resp_occupation <- as.character(df_w2$resp_occupation)
+  df_w4$resp_occupation <- as.character(df_w4$resp_occupation)
+  
+  if (merge_0) {
+    df <- bind_rows(df_w0, df_w1, df_w2, df_w3, df_w4, df_w5, df_w6)
+  } else {
+    df <- bind_rows(df_w1, df_w2, df_w3, df_w4, df_w5, df_w6)
+    df_merged <- df_merged %>% 
+    filter(wave > 0)
+  }
+  
+  df$weight_pooled <- df_merged$weight_pooled
+  df$weight_city <- df_merged$weight_city
+  
+  rm(df_merged)
+  
+} else if (file_type == "merged") {
+  df <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/df_all_waves.rds')
+
+  df <- df %>% 
+    filter(wave > 0)
+  
+} else {
+  print("change file_type to either manual or merged")
+}
+
+names(df) <- make.unique(names(df))
+```
+
+converting dates to factor
+```{r}
+if (merge_0) {
+    df$data_collected_dates <- factor(df$data_collected_dates, levels = c("March 20-April 13, '20" ,"April 11-May 5, '20", "June 18-24, '20", "September 12-20, '20'", "December 1-7, '20'","February 9-14, '21'","May 14-25, '21'"))  
+  } else {
+    df$data_collected_dates <- factor(df$data_collected_dates, levels = c("April 11-May 5, '20", "June 18-24, '20", "September 12-20, '20'", "December 1-7, '20'","February 9-14, '21'","May 14-25, '21'"))  
+  }
+
+print(table(df$data_collected_dates))
+print(table(df$wave))
+```
+We're missing a "conservative" but we have two moderates?
+```{r}
+political_view_mapping <- c(
+  'Extremely conservative' = 1,
+  'Slightly conservative' = 2,
+  'Moderate' = 3,
+  'Middle of the road' = 4,
+  'Slightly liberal' = 5,
+  'Liberal' = 6,
+  'Extremely liberal' = 7
+)
+
+df <- df %>%
+  mutate(political_view_numeric = unlist(map(political_view, ~ political_view_mapping[.])))
+
+print(table(df$political_view))
+```
+creating the education, race, and employed variables (merged file has no employment variable)
+```{r}
+if (file_type == "manual"){
+df <- df %>%
+  mutate(educ_group = case_when(
+    resp_educ == "Less than high school degree" ~ "Less than high school",
+    resp_educ %in% c("High school graduate (high school diploma or equivalent including GED)", 
+                     "Some college but no degree", 
+                     "Associate degree in college (2-year)") ~ "High school graduate",
+    resp_educ %in% c("Bachelor's degree in college (4-year)", 
+                     "Master's degree", 
+                     "Doctoral degree", 
+                     "Professional degree (JD, MD)") ~ "College graduate and above",
+    TRUE ~ "Unknown"
+  ))
+
+df$educ_group <- as.factor(df$educ_group)
+
+# Print the counts of unique values in educ_group
+print(table(df$educ_group, useNA = "ifany"))
+
+race_columns <- grep("^resp_race_", names(df), value = TRUE)
+df[race_columns] <- lapply(df[race_columns], function(x) replace(x, is.na(x), 0))
+
+df <- df %>%
+  mutate(r_race = case_when(
+    resp_race_1 == "White" ~ "White",
+    resp_race_2 == "Black or African American" ~ "Black",
+    resp_race_4 == "Asian" ~ "Asian",
+    TRUE ~ "Other / Mixed"
+  ))
+
+# Print the counts of unique values in r_race
+print(table(df$r_race, useNA = "ifany"))
+
+employment_columns <- grep("^resp_employ_", names(df), value = TRUE)
+df[employment_columns] <- lapply(df[employment_columns], function(x) replace(x, is.na(x), 0))
+
+#this will not work because there are no employment variables in the merged file
+df <- df %>%
+  mutate(r_working = if_else(industry == "I don't work", "Not Working", "Working"))
+
+# Print the counts of unique values in r_working
+print(table(df$r_working, useNA = "ifany"))
+
+} else if (file_type == "merged"){
+  df$educ_group <- df$educ
+  df$r_race <- df$w_race
+  #there's no employment variable in the merged data
+}
+```
+dependent binary variables
+```{r}
+df <- df %>%
+  mutate(
+    binary_concern = case_when(
+      covid19_concern %in% c("Somewhat concerned", "Very concerned") ~ 1L,
+      !is.na(covid19_concern) ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    binary_concern_strong = case_when(
+      covid19_concern == "Very concerned" ~ 1L,
+      !is.na(covid19_concern) ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    contact_reduction = case_when(
+      covid19_f2fchange == "I have greatly reduced face-to-face interaction with others" ~ 1L,
+      !is.na(covid19_f2fchange) ~ 0L,
+      TRUE ~ NA_integer_
+    )
+  )
+print(table(df$binary_concern_strong))
+
+df <- df %>%
+  mutate(strong_concern_inverse = ifelse(is.na(binary_concern_strong), NA,
+                                        ifelse(binary_concern_strong == 1, 0,
+                                               ifelse(binary_concern_strong == 0, 1, NA))))
+
+print(table(df$binary_concern_strong))
+```
+manual merge = 27,937, already merged = 69,135
+```{r}
+if (file_type == "manual") {
+  
+  df_w1_nonhhalters <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_alters_nonhh_wave1_unweighted.rds')
+  df_w1_nonhhalters <- df_w1_nonhhalters %>% 
+    select(rid, protection_1, protection_2, protection_3, protection_4)
+  
+  df_w2_nonhhalters <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_alters_nonhh_wave2_unweighted.rds')
+  df_w2_nonhhalters <- df_w2_nonhhalters %>% 
+    select(rid, protection_1, protection_2, protection_3, protection_4)
+  
+  df_w3_nonhhalters <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_alters_nonhh_wave3_unweighted.rds')
+  df_w3_nonhhalters <- df_w3_nonhhalters %>% 
+    select(rid, protection_1, protection_2, protection_3, protection_4)
+  
+  df_w4_nonhhalters <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_alters_nonhh_wave4_unweighted.rds')
+  df_w4_nonhhalters <- df_w4_nonhhalters %>% 
+    select(rid, protection_1, protection_2, protection_3, protection_4)
+  
+  df_w5_nonhhalters <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_alters_nonhh_wave5_unweighted.rds')
+  df_w5_nonhhalters <- df_w5_nonhhalters %>% 
+    select(rid, protection_1, protection_2, protection_3, protection_4)
+  
+  df_w6_nonhhalters <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/national_alters_nonhh_wave6_unweighted.rds')
+  df_w6_nonhhalters <- df_w6_nonhhalters %>% 
+    select(rid, protection_1, protection_2, protection_3, protection_4)
+  
+  df_alters_combined <- rbind(df_w1_nonhhalters, df_w2_nonhhalters, df_w3_nonhhalters, df_w4_nonhhalters, df_w5_nonhhalters, df_w6_nonhhalters)
+  rm(df_w1_nonhhalters, df_w2_nonhhalters, df_w3_nonhhalters, df_w4_nonhhalters, df_w5_nonhhalters, df_w6_nonhhalters)
+} else if (file_type == "merged") {
+  df_alters_combined <- readRDS('/Users/chrissoria/documents/research/bicsdata/bics-data/data/lucid-pipeline/df_alters_all_waves.rds')
+}
+```
+
+Now I'll calculate the proportion of contacts carried out with masks (the merged file doesn't have this)
+```{r}
+if (file_type == "manual") {
+df_alters_combined <- df_alters_combined %>%
+  mutate(
+    Mask_Used = as.integer(protection_1 == "Wear a face mask" |
+                           protection_2 == "Wear a face mask" |
+                           protection_3 == "Wear a face mask" |
+                           protection_4 == "Wear a face mask"),
+    Gloves_Used = as.integer(protection_1 == "Wear gloves" |
+                             protection_2 == "Wear gloves" |
+                             protection_3 == "Wear gloves" |
+                             protection_4 == "Wear gloves"),
+    Other_Protective_Equipment_Used = as.integer(protection_1 == "Wear other protective equipment" |
+                                                  protection_2 == "Wear other protective equipment" |
+                                                  protection_3 == "Wear other protective equipment" |
+                                                  protection_4 == "Wear other protective equipment")
+  )
+
+df_aggregated <- df_alters_combined %>%
+  group_by(rid) %>%
+  summarise(
+    Total_Masks_Used = sum(Mask_Used, na.rm = TRUE),
+    Total_Gloves_Used = sum(Gloves_Used, na.rm = TRUE),
+    Total_Other_Protective_Equipment_Used = sum(Other_Protective_Equipment_Used, na.rm = TRUE),
+    Contacts = n()
+  ) %>%
+  mutate(
+    Norm_Masks_Used = (Total_Masks_Used / Contacts) *100, #changing this to a percentage for ease of interpretation
+    Norm_Gloves_Used = Total_Gloves_Used / Contacts,
+    Norm_Other_Protective_Equipment_Used = Total_Other_Protective_Equipment_Used / Contacts,
+    Non_Weighted_Safety_Index = (Norm_Masks_Used + Norm_Gloves_Used + Norm_Other_Protective_Equipment_Used) / 3,
+    Weighted_Safety_Index = (Norm_Masks_Used + Norm_Gloves_Used + Norm_Other_Protective_Equipment_Used) / (3 * Contacts)
+  )
+
+df = left_join(df, df_aggregated, by = "rid")
+} else if (file_type == "merged") {
+  df = left_join(df, df_alters_combined, by = "rid")
+  print("The merged file doesn't have information on mask usage")
+}
+```
+Now let's merge in the ZIP features file
+```{r}
+ZIP_FEATURES <- fread('../data/ZIP_Features.csv', colClasses = c(ZIP = "character", CD = "character", COUNTY_FIPS = "character", STATE_FIPS = "character", CONGRESSPERSON_PARTY = "character"))
+```
+
+```{r}
+unique_occupations <- unique(df$resp_occupation)
+
+print(unique_occupations)
+
+essential_categories <- c("Accommodation or food services", "Admin, support, waste management or remediation services", 
+                          "Agriculture, Forestry, Fishing, and Hunting", "Forestry, fishing, hunting or agriculture support", 
+                          "Manufacturing", "Construction", "Finance or insurance", "Mining", "Transportation or warehousing", 
+                          "Utilities", "Government or Public Policy", "Community/Social Services", 
+                          "Mining, Quarrying, Oil and Gas Extraction", "Transportation", "Warehousing/Logistics", 
+                          "Educational services", "Professional, scientific or technical services", "Health care")
+
+df <- df %>%
+  mutate(essential = ifelse(resp_occupation %in% essential_categories, 1, 0))
+```
+
+getting df ready to merge to ZIP_FEATURES
+merged file questions:
+Why are there duplicates w_gender and gender, for example?
+No nativity (US-born vs not), no resp_hhsize,lefthome_num, policy_sip (), health insurance, wave is called wave.x, city is called city.x
+```{r}
+if (file_type == "manual") {
+df <- rename(df, ZIP = resp_zip)
+
+names(df) <- make.unique(names(df))
+
+# Trim whitespace from ZIP column
+df$ZIP <- trimws(df$ZIP)
+
+columns_to_keep <- c('ResponseId','StartDate','resp_yob','resp_sex','resp_hispanic','r_race','resp_nativity','ZIP',
+                     'resp_hhsize','r_working','resp_occupation','lefthome_num','num_cc_nonhh',
+                     'lefthome_where_1','lefthome_where_2','lefthome_where_3','lefthome_where_4','lefthome_where_10',
+                     'lefthome_where_8','lefthome_where_9','lefthome_where_5','lefthome_where_11','lefthome_where_6',
+                     'lefthome_where_7','inet_freq','covid19_familiar','covid19_concern',
+                     'covid19_f2fchange','covid19_reduceOK','policy_sip','age','hhi','political_party','political_view',
+                     'industry','health_insurance','interview_date','wave','agecat','city','covid19_vax','covid19_whynot_vax',
+                     'Non_Weighted_Safety_Index','Weighted_Safety_Index','Norm_Masks_Used','educ_group','contact_reduction',
+                     'binary_concern','binary_concern_strong','resp_educ','Contacts',
+                     'data_collected_dates','weight_pooled','weight_city','num_cc','strong_concern_inverse','essential')
+
+df <- df[columns_to_keep]
+
+} else if (file_type == "merged") {
+  df <- rename(df, ZIP = zip)
+  df$ZIP <- trimws(df$ZIP)
+  
+  columns_to_keep <- c('ResponseId','age','gender','hispanic','w_race','ZIP',
+                     'num_cc_nonhh','covid19_familiar','covid19_concern',
+                     'covid19_f2fchange','covid19_reduceOK','hhi','political_party','political_view',
+                     'wave.x','agecat','city.x','covid19_vax','covid19_whynot_vax',
+                     'educ_group','contact_reduction',
+                     'binary_concern','binary_concern_strong','educ','data_collected_dates')
+  
+  df <- df[columns_to_keep]
+}
+```
+merging zip features to bics
+```{r}
+bics_zip_features <- left_join(df, ZIP_FEATURES, by = "ZIP")
+
+bics_zip_features <- bics_zip_features %>% 
+  distinct(ResponseId, .keep_all = TRUE)
+```
+How many matches do we get?
+```{r}
+bics_zip_features %>%
+  summarise(
+    Num_Missing_ZIP = sum(is.na(ZIP)),
+    Pct_Missing_ZIP = mean(is.na(ZIP)) * 100,
+    Pct_ZIP_5_Characters = mean(nchar(as.character(ZIP)) == 5) * 100,
+    state_Missing = sum(is.na(bics_zip_features$USPS_STATE)),
+    Pct_State_Missing = mean(!is.na(bics_zip_features$USPS_STATE)) * 100
+    
+  ) %>%
+  print()
+```
+And county-level mask mandates? Only .5% of people are missing this information.
+```{r}
+bics_zip_features %>%
+  summarise(
+    Num_Missing_maskmandates = sum(is.na(county_conditions)),
+    Pct_Missing_maskmandates = mean(is.na(county_conditions)) * 100
+  ) %>%
+  print()
+```
+Let's clean up the mask mandates variable
+```{r}
+strict_mandates <- c("all public places","Face coverings are required to be worn over the mouth and nose of all county residents while inside or on grounds of all government buildings, private businesses, organizations or venues open to the public.","in public places","indoor and outdoor places","Indoor, outdoor, public places and public transportations","most public places", "public places where 6 feet of social distance cannot be maintained","All employees and members of the general public","Face masks are now required when exercising, even outdoors.","Require every person in the city to wear a face covering when inside a commercial business or other structure, building or space open to the public. Masks also will be required in an outdoor space when staying 6 feet apart for social distancing from someone not of the same household is difficult.  (passed by Tulsa City Council)","State leaders targeted Butler County as a red-alert area Tuesday, requiring all residents to wear protective masks in public to slow the recent local spike in coronavirus cases.","All employees and members of the general public all public places","public places where 6 feet of social distance cannot be maintained","public places and where social distancing impossible")
+
+less_strict_mandates <- c("Require masks in indoor public places throughout Oklahoma City. (a mask mandate passed by Oklahoma City Coucil; however, a similar mandate denied by the county commissioners)","All customers in retail facilities, most forward facing facilities and if you are indoors or outdoors and cannot be 6ft away from another person, you must wear a mask.","And in 7/15 people were asked to wear masks when entering the government buildings.","Anderson City Council approves mask ordinance in 7/23","Anyone over age 2 who can medically tolerate a face covering when in a public place and unable to maintain social distancing.","counties with more than 20 coronavirus cases to wear a face covering over the nose and mouth while in a business or other building open to the public, as well as outdoor public spaces, whenever social distancing is not possible.","Employees working with the public","following the state order","in all types of businesses","indoor commercial businesses and town offices in the town of Boone","indoor places and indoor businesses, workers need to wear one if outdoor not social distancing impossible","Indoor public spaces and at any organized outdoor activity where social distancing cannot be maintained, including markets, weddings and parties","inside public spaces except when eating or drinking","retail only","The Clinton County Board of Supervisors voted in favor of requiring face masks or face shields to be worn in all Clinton County buildings starting Tuesday, July 27.","applies to any indoor or confined public setting where a person will be within six feet of another individual, who does not share the same household(5/27). Follow the state order(7/10).","Indoor public spaces and at any organized outdoor activity where social distancing cannot be maintained, including markets, weddings and parties","The directive applies to any indoor or confined public setting where a person will be within six feet of another individual, who does not share the same household(5/27). Follow the state order(7/10).","Face masks no longer mandatory for Bell County businesses started from 6_29, but Kentucky ordered to wear masks started from 7_10_2020")
+
+unclear_or_unspecified_mandates <- c("unspecified", "unclear","other")
+
+no_mandates <- c("Local officials generally agreed with the idea behind the mandate, but reactions differed on the execution of the order as well as if it was necessary at all. The public reaction locally also varied wildly, ranging from angered to very pleased based on social media input.","no mandate","opt out","opts out of the provisions of Executive Order No. 20-52 requiring masks or other face coverings in public but recommend the use of face coverings","Despite not passing a city-wide masking requirement, Nixa city leaders have recommended that people follow the Centers for Disease Control and Prevention guidelines about wearing face coverings in public.")
+
+bics_zip_features <- bics_zip_features %>% 
+  mutate(county_conditions = trimws(county_conditions)) %>%
+  mutate(county_mask_mandate = case_when(
+    county_conditions %in% strict_mandates ~ "Strict",
+    county_conditions %in% less_strict_mandates ~ "Less Strict",
+    county_conditions %in% unclear_or_unspecified_mandates ~ "Unspecified or Unclear Mandate",
+    county_conditions %in% no_mandates ~ "No Mandate",
+    TRUE ~ NA_character_
+  )) %>%
+  mutate(county_mask_mandate = factor(county_mask_mandate, levels = c("Strict", "Less Strict", "Unspecified or Unclear Mandate", "No Mandate")))
+
+
+print(table(bics_zip_features$county_conditions, useNA = "always"))
+print(table(bics_zip_features$county_mask_mandate, useNA = "always"))
+```
+
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(CONGRESSPERSON_PARTY = ifelse(CONGRESSPERSON_PARTY == "", NA_character_,
+                     ifelse(CONGRESSPERSON_PARTY == " ", NA_character_, CONGRESSPERSON_PARTY)))
+
+bics_zip_features <- bics_zip_features %>%
+  mutate(political_party_to_CD = ifelse(!is.na(CONGRESSPERSON_PARTY), 
+                                        paste(political_party, "in", CONGRESSPERSON_PARTY, "led CD"), 
+                                        NA_character_))
+
+bics_zip_features <- bics_zip_features %>%
+  mutate(political_party_to_CD = ifelse(political_party == "Prefer not to answer", NA_character_, political_party_to_CD))
+
+bics_zip_features <- bics_zip_features %>%
+  mutate(political_party_to_CD = ifelse(is.na(political_party_to_CD), "unknown party or CD", political_party_to_CD))
+
+print(table(bics_zip_features$CONGRESSPERSON_PARTY, useNA = "always"))
+print(table(bics_zip_features$political_party_to_CD, useNA = "always"))
+```
+creating a variable that accounts for ideology
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(political_view_to_CD = ifelse(!is.na(CONGRESSPERSON_PARTY), 
+                                        paste(political_view, "in", CONGRESSPERSON_PARTY, "led CD"), 
+                                        NA_character_))
+
+print(table(bics_zip_features$CONGRESSPERSON_PARTY, useNA = "always"))
+print(table(bics_zip_features$political_view_to_CD, useNA = "always"))
+```
+
+
+generating binary variables for whether someone is in an opposing party CD (to observe potential general effects), vaccinated binaries, and Independent
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    In_Opposing_Party_CD = as.integer(political_party != CONGRESSPERSON_PARTY & !is.na(CONGRESSPERSON_PARTY) & political_party != "Prefer not to answer"),
+    Independent = as.integer(political_party == "Independent"),
+    Vaccinated = case_when(
+      covid19_vax == "Yes, I have received at least one dose of a vaccine" ~ 1L,
+      covid19_vax == "No, I have not" ~ 0L,
+      TRUE ~ NA_integer_
+    )
+  )
+
+# Print the counts of unique values in In_Opposing_Party_CD column
+print(table(bics_zip_features$In_Opposing_Party_CD, useNA = "ifany"))
+
+# Print the counts of unique values in political_party column
+print(table(bics_zip_features$political_party, useNA = "ifany"))
+
+# Print the counts of unique values in CONGRESSPERSON_PARTY column
+print(table(bics_zip_features$CONGRESSPERSON_PARTY, useNA = "ifany"))
+
+```
+Next, I'm creating categorical variables based on percentage of the county voting a certain way
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    Categorical_Trump_County_Share = case_when(
+      trump_percentage_won < VOTE_SHARE_LOW ~ "Less Than a Third",
+      trump_percentage_won < VOTE_SHARE_HIGH ~ "Less than Two Thirds Greater Than One Third",
+      trump_percentage_won >= VOTE_SHARE_HIGH ~ "Greater than or Equal to Two thirds",
+      TRUE ~ NA_character_
+    ),
+    Categorical_Biden_County_Share = case_when(
+      biden_percentage_won < VOTE_SHARE_LOW ~ "Less Than a Third",
+      biden_percentage_won < VOTE_SHARE_HIGH ~ "Less than Two Thirds Greater Than One Third",
+      biden_percentage_won >= VOTE_SHARE_HIGH ~ "Greater than or Equal to Two thirds",
+      TRUE ~ NA_character_
+    ),
+    Percentage_Trump_Greater_Than_Two_Thirds = case_when(
+      trump_percentage_won >= VOTE_SHARE_HIGH ~ 1L,
+      trump_percentage_won < VOTE_SHARE_HIGH ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    Percentage_Trump_Less_Than_Two_Thirds = case_when(
+      trump_percentage_won < VOTE_SHARE_HIGH ~ 1L,
+      trump_percentage_won <= VOTE_SHARE_HIGH ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    Percentage_Biden_Greater_Than_Two_Thirds = case_when(
+      biden_percentage_won >= VOTE_SHARE_HIGH ~ 1L,
+      biden_percentage_won < VOTE_SHARE_HIGH ~ 0L,
+      TRUE ~ NA_integer_
+    ),
+    Percentage_Biden_Less_Than_Two_Thirds = case_when(
+      biden_percentage_won < VOTE_SHARE_HIGH ~ 1L,
+      biden_percentage_won <= VOTE_SHARE_HIGH ~ 0L,
+      TRUE ~ NA_integer_
+    )
+  )
+print(table(bics_zip_features$Categorical_Trump_County_Share))
+print(table(bics_zip_features$Categorical_Biden_County_Share))
+```
+And also based on CD
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    Categorical_Repub_CD_County_Share = case_when(
+      CD_PERCENT_REPUBLICAN < CD_SHARE_Q1 ~ "Less Than a Quarter",
+      CD_PERCENT_REPUBLICAN < CD_SHARE_Q2 & CD_PERCENT_REPUBLICAN > CD_SHARE_Q1 ~ "Two Quarters",
+      CD_PERCENT_REPUBLICAN < CD_SHARE_Q3 & CD_PERCENT_REPUBLICAN > CD_SHARE_Q2 ~ "Three Quarters",
+      CD_PERCENT_REPUBLICAN >= CD_SHARE_Q3 ~ "Greater than or Equal to Three Quarters",
+      TRUE ~ NA_character_
+    ),
+    Categorical_Dem_CD_County_Share = case_when(
+      CD_PERCENT_DEMOCRAT < CD_SHARE_Q1 ~ "Less Than a Quarter",
+      CD_PERCENT_DEMOCRAT < CD_SHARE_Q2 ~ "Two Quarters",
+      CD_PERCENT_DEMOCRAT < CD_SHARE_Q3 ~ "Three Quarters",
+      CD_PERCENT_DEMOCRAT >= CD_SHARE_Q3 ~ "Greater than or Equal to Three Quarters",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Print the counts of unique values in Categorical_Repub_CD_County_Share column
+print(table(bics_zip_features$Categorical_Repub_CD_County_Share, useNA = "ifany"))
+```
+Next, let's add a variable that treats urban and rural as a binary.
+1 = Metro - Counties in metro areas of 1 million population or more
+2 = Metro - Counties in metro areas of 250,000 to 1 million population \
+3 = Metro - Counties in metro areas of fewer than 250,000 population
+4 = Nonmetro - Urban population of 20,000 or more, adjacent to a metro area
+5 = Nonmetro - Urban population of 20,000 or more, not adjacent to a metro area
+6 = Nonmetro - Urban population of 2,500 to 19,999, adjacent to a metro area
+7 = Nonmetro - Urban population of 2,500 to 19,999, not adjacent to a metro area
+8 = Nonmetro - Completely rural or less than 2,500 urban population, adjacent to a metro area
+9 = Nonmetro - Completely rural or less than 2,500 urban population, not adjacent to a metro area
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    COUNT_RUCC_CAT = case_when(
+      COUNTY_RUCC_2013 %in% c(1, 2) ~ "Urban Metro",
+      COUNTY_RUCC_2013 %in% 3:7 ~ "Urban Nonmetro",
+      COUNTY_RUCC_2013 %in% c(8, 9) ~ "Rural",
+      TRUE ~ NA_character_
+    ),
+    COUNT_RUCC_BINARY = case_when(
+      COUNTY_RUCC_2013 %in% 1:7 ~ "Urban",
+      COUNTY_RUCC_2013 %in% c(8, 9) ~ "Rural",
+      TRUE ~ NA_character_
+    )
+  )
+```
+
+```{r}
+rm(df, df_alters_combined, ZIP_FEATURES, columns_to_keep, employment_columns, political_view_mapping, race_columns, df_aggregated)
+```
+# =============================================================================
+# 6. FINAL DATASET PREPARATION
+# =============================================================================
+
+# Making the column names unique (in case i merged in duplicate columns somehow)
+```{r}
+names(bics_zip_features) <- make.unique(names(bics_zip_features))
+```
+Making the percent of congressional district that voted a certain way be a categorical variable and setting the reference category
+```{r}
+bics_zip_features$Categorical_Dem_CD_County_Share <- factor(
+  bics_zip_features$Categorical_Dem_CD_County_Share,
+  levels = c("Greater than or Equal to Three Quarters", "Three Quarters", "Two Quarters", "Less Than a Quarter"),
+  ordered = FALSE
+)
+
+bics_zip_features$Categorical_Repub_CD_County_Share <- factor(
+  bics_zip_features$Categorical_Repub_CD_County_Share,
+  levels = c("Greater than or Equal to Three Quarters", "Three Quarters", "Two Quarters", "Less Than a Quarter"),
+  ordered = FALSE
+)
+```
+We might want to control for city samples, so let's pull out some dummies
+```{r}
+bics_zip_features$city <- as.factor(bics_zip_features$city)
+bics_zip_features$city <- relevel(bics_zip_features$city, ref = "National")
+
+dummy_city <- model.matrix(~ city - 1, data = bics_zip_features)
+bics_zip_features <- cbind(bics_zip_features, dummy_city)
+rm(dummy_city)
+```
+The income variable is a bit too high-resolution to use in a model as a categorical variable
+Pulling out party-specific data sets 
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(Income_Category = case_when(
+    hhi %in% c("Less than $5,000", "$5,000 to $9,999", "$10,000 to $14,999", "$15,000 to $19,999", "$20,000 to $24,999", "$25,000 to $29,999") ~ "Less than $30,000",
+    hhi %in% c("$30,000 to $34,999", "$35,000 to $39,999", "$40,000 to $44,999", "$45,000 to $49,999", "$50,000 to $54,999", "$55,000 to $59,999") ~ "$30,000 to $59,999",
+    hhi %in% c("$60,000 to $64,999", "$65,000 to $69,999", "$70,000 to $74,999", "$75,000 to $79,999", "$80,000 to $84,999", "$85,000 to $89,999") ~ "$60,000 to $89,999",
+    hhi %in% c("$90,000 to $94,999", "$95,000 to $99,999", "$100,000 to $124,999", "$125,000 to $149,999", "$150,000 to $174,999", "$175,000 to $199,999") ~ "$90,000 to $199,999",
+    hhi %in% c("$200,000 to $249,999", "$250,000 and above") ~ "$200,000 and above",
+    TRUE ~ "Prefer not to answer"
+  ))
+
+bics_zip_features$Income_Category <- as.factor(bics_zip_features$Income_Category)
+bics_zip_features$Income_Category <- factor(bics_zip_features$Income_Category, levels = c("Less than $30,000", "$30,000 to $59,999", "$60,000 to $89,999","$90,000 to $199,999","200,000 to $249,999", "Prefer not to answer"))
+```
+setting sex to factor, creating dummies for male, race-white, working
+```{r}
+bics_zip_features$resp_sex <- as.factor(bics_zip_features$resp_sex)
+bics_zip_features$resp_sex <- factor(bics_zip_features$resp_sex, levels = c("Male","Female","Other"))
+
+#male
+bics_zip_features <- bics_zip_features %>% 
+  mutate(male = case_when(
+    is.na(resp_sex) ~ NA_real_,
+    resp_sex == "Male" ~ 1,
+    TRUE ~ 0
+  )) %>% 
+  mutate(r_male = as.factor(male))
+#white
+bics_zip_features <- bics_zip_features %>% 
+  mutate(white = case_when(
+    is.na(r_race) ~ NA_real_,
+    r_race == "White" ~ 1,
+    TRUE ~ 0
+  ))
+#hispanic
+bics_zip_features <- bics_zip_features %>% 
+  mutate(r_hispanic_num = case_when(
+    is.na(resp_hispanic) ~ NA_real_,
+    resp_hispanic == "Yes" ~ 1,
+    TRUE ~ 0
+  ))
+#working
+bics_zip_features <- bics_zip_features %>% 
+  mutate(r_working_num = case_when(
+    is.na(r_working) ~ NA_real_,
+    r_working == "Working" ~ 1,
+    TRUE ~ 0
+  ))
+#college
+bics_zip_features <- bics_zip_features %>% 
+  mutate(r_college_grad = case_when(
+    is.na(resp_educ) ~ NA_real_,
+    resp_educ == "College graduate" ~ 1,
+    TRUE ~ 0
+  ))
+
+bics_zip_features <- bics_zip_features %>% 
+  mutate(r_college_grad = as.factor(r_college_grad))
+
+#urban
+bics_zip_features <- bics_zip_features %>% 
+  mutate(c_urban = case_when(
+    is.na(COUNT_RUCC_BINARY) ~ NA_real_,
+    COUNT_RUCC_BINARY == "Urban" ~ 1,
+    TRUE ~ 0
+  ))
+#over 65 or below
+bics_zip_features <- bics_zip_features %>%
+  mutate(young = case_when(
+    is.na(age) ~ NA_real_,  
+    age < 64 ~ 1,
+    TRUE ~ 0
+  ))
+
+#republican
+bics_zip_features <- bics_zip_features %>%
+  mutate(republican = case_when(
+    is.na(political_party) ~ NA_real_, 
+    political_party == "Republican" ~ 1,
+    TRUE ~ 0
+  ))
+
+#democrat
+bics_zip_features <- bics_zip_features %>%
+  mutate(democrat = case_when(
+    is.na(political_party) ~ NA_real_,  
+    political_party == "Democrat" ~ 1,
+    TRUE ~ 0
+  ))
+
+#republican district
+bics_zip_features <- bics_zip_features %>%
+  mutate(republican_district = case_when(
+    is.na(CONGRESSPERSON_PARTY) ~ NA_real_, 
+    CONGRESSPERSON_PARTY == "Republican" ~ 1,
+    TRUE ~ 0
+  ))
+
+#democrat district
+bics_zip_features <- bics_zip_features %>%
+  mutate(democrat_district = case_when(
+    is.na(CONGRESSPERSON_PARTY) ~ NA_real_,  
+    CONGRESSPERSON_PARTY == "Democratic" ~ 1,
+    TRUE ~ 0
+  ))
+
+#metro
+bics_zip_features <- bics_zip_features %>%
+  mutate(Metro = case_when(
+    COUNTY_RUCC_2013 < 3 ~ 1,
+    COUNTY_RUCC_2013 > 3 ~ 0,
+    TRUE ~ NA_real_
+  )) %>%
+  mutate(r_metro = as.factor(Metro))
+```
+Now, it might be the case that political orientation is more important that political party. For example, Republicans in certain regions might actually just be less conservative, and therefore it might not be the party affiliation that matters but political orientation
+```{r}
+bics_zip_features <- bics_zip_features %>% 
+  mutate(
+    extreme_liberal = case_when(
+      political_view == "Extremely liberal" ~ 1,
+      is.na(political_view) ~ NA_real_,
+      TRUE ~ 0
+    ),
+    extreme_conservative = case_when(
+      political_view == "Extremely conservative" ~ 1,
+      is.na(political_view) ~ NA_real_,
+      TRUE ~ 0
+    ),
+    moderate = case_when(
+      political_view == "Moderate" ~ 1,
+      is.na(political_view) ~ NA_real_,
+      TRUE ~ 0
+    )
+  )
+
+bics_zip_features <- bics_zip_features %>% 
+  mutate(
+    liberal = case_when(
+      political_view %in% c("Extremely liberal","Liberal","Slightly Liberal") ~ 1,
+      is.na(political_view) ~ NA_real_,
+      TRUE ~ 0
+    ),
+    conservative = case_when(
+      political_view %in% c("Extremely conservative","Middle of the road", "Slightly conservative") ~ 1,
+      is.na(political_view) ~ NA_real_,
+      TRUE ~ 0
+    )
+  )
+
+bics_zip_features$political_view <- as.factor(bics_zip_features$political_view)
+```
+```{r}
+bics_zip_features$wave <- as.factor(bics_zip_features$wave)
+```
+Creating an interview day variable
+```{r}
+library(lubridate)
+
+bics_zip_features <- bics_zip_features %>%
+  mutate(interview_day = as.Date(interview_date)) %>% 
+  mutate(interview_day = lubridate::wday(interview_day, label = TRUE, abbr = FALSE)) %>% 
+  mutate(interview_day_weekend = case_when(
+    interview_day %in% c("Friday", "Saturday", "Sunday") ~ "Weekend",
+    TRUE ~ "Weekday"
+  ))
+
+table(bics_zip_features$interview_day, bics_zip_features$interview_day_weekend)
+```
+I want to make Independents the reference category for presenting multivariate models, also making whites the reference category, state is california
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    political_party = factor(
+      political_party,
+      levels = c("Democrat", "Independent", "Republican", "Prefer not to answer")
+    ),
+    r_race = factor(
+      r_race,
+      levels = c("White", "Black", "Asian", "Other / Mixed")
+    ),
+    STATE = factor(STATE) %>% 
+      relevel(ref = "California")
+  )
+```
+We decided to use age groups for the models in order to capture any non-linear effects
+```{r}
+bics_zip_features$age_group <- factor(
+  cut(
+    bics_zip_features$age,
+    breaks = c(18, 30, 45, 55, 65, 100),
+    labels = c("[18,30)", "[30,45)", "[45,55)", "[55,65)", "[65,100]"),
+    right = FALSE
+  ),
+  levels = c("[18,30)", "[30,45)", "[45,55)", "[55,65)", "[65,100]")
+)
+
+
+table(bics_zip_features$age_group)
+```
+
+below, I'm making some adjustments to dependent variables to better fit a linear model
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(log_num_cc = log(num_cc + 1))
+```
+here, I'm capping the total contacts variable so that it's capped at 50 plus (for plotting purposes)
+```{r}
+bics_zip_features$num_cc_50_max <- ifelse(bics_zip_features$num_cc >= 50, 50, bics_zip_features$num_cc)
+bics_zip_features$num_cc_25_max <- ifelse(bics_zip_features$num_cc >= 25, 25, bics_zip_features$num_cc)
+bics_zip_features$num_cc_15_max <- ifelse(bics_zip_features$num_cc >= 15, 15, bics_zip_features$num_cc)
+```
+```{r}
+inc_w1 <- read_csv('../data/incidence/wave_1_incidence.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_incidence = wave_1_incidence,
+         prev_week_incidence = wave_1_inc_week_lag)
+
+inc_w2 <- read_csv('../data/incidence/wave_2_incidence.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_incidence = wave_2_incidence,
+         prev_week_incidence = wave_2_inc_week_lag)
+
+inc_w3 <- read_csv('../data/incidence/wave_3_incidence.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_incidence = wave_3_incidence,
+         prev_week_incidence = wave_3_inc_week_lag)
+
+inc_w4 <- read_csv('../data/incidence/wave_4_incidence.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_incidence = wave_4_incidence,
+         prev_week_incidence = wave_4_inc_week_lag)
+
+inc_w5 <- read_csv('../data/incidence/wave_5_incidence.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_incidence = wave_5_incidence,
+         prev_week_incidence = wave_5_inc_week_lag)
+
+inc_w6 <- read_csv('../data/incidence/wave_6_incidence.csv') %>%
+  rename(COUNTY_FIPS = FIPS,
+         current_week_incidence = wave_6_incidence,
+         prev_week_incidence = wave_6_inc_week_lag)
+
+
+inc_w6 <- inc_w6 %>%
+  mutate(COUNTY_FIPS = as.character(COUNTY_FIPS))
+
+mort_w1 <- read_csv('../data/mortality/wave_1_mortality.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_mortality = wave_1_mortality,
+         prev_week_mortality = wave_1_mort_week_lag)
+
+mort_w2 <- read_csv('../data/mortality/wave_2_mortality.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_mortality = wave_2_mortality,
+         prev_week_mortality = wave_2_mort_week_lag)
+
+mort_w3 <- read_csv('../data/mortality/wave_3_mortality.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_mortality = wave_3_mortality,
+         prev_week_mortality = wave_3_mort_week_lag)
+
+mort_w4 <- read_csv('../data/mortality/wave_4_mortality.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_mortality = wave_4_mortality,
+         prev_week_mortality = wave_4_mort_week_lag)
+
+mort_w5 <- read_csv('../data/mortality//wave_5_mortality.csv', col_types = cols(FIPS = col_character())) %>% 
+  rename(COUNTY_FIPS = FIPS,
+         current_week_mortality = wave_5_mortality,
+         prev_week_mortality = wave_5_mort_week_lag)
+
+mort_w6 <- read_csv('../data/mortality/wave_6_mortality.csv') %>%
+  rename(COUNTY_FIPS = FIPS,
+         current_week_mortality = wave_6_mortality,
+         prev_week_mortality = wave_6_mort_week_lag)
+
+mort_w6 <- mort_w6 %>%
+  mutate(COUNTY_FIPS = as.character(COUNTY_FIPS))
+
+waves <- list()
+
+for(i in 1:6) {
+  waves[[paste("wave", i, sep = "")]] <- bics_zip_features %>%
+    filter(wave == i)
+}
+
+wave1 <- waves[["wave1"]]
+wave2 <- waves[["wave2"]]
+wave3 <- waves[["wave3"]]
+wave4 <- waves[["wave4"]]
+wave5 <- waves[["wave5"]]
+wave6 <- waves[["wave6"]]
+
+wave1 <- wave1 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+wave2 <- wave2 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+wave3 <- wave3 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+wave4 <- wave4 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+wave5 <- wave5 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+wave6 <- wave6 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+
+inc_w1 <- inc_w1 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+inc_w2 <- inc_w2 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+inc_w3 <- inc_w3 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+inc_w4 <- inc_w4 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+inc_w5 <- inc_w5 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+inc_w6 <- inc_w6 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+
+mort_w1 <- mort_w1 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+mort_w2 <- mort_w2 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+mort_w3 <- mort_w3 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+mort_w4 <- mort_w4 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+mort_w5 <- mort_w5 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+mort_w6 <- mort_w6 %>%
+  mutate(COUNTY_FIPS = str_pad(COUNTY_FIPS, width = 5, pad = "0", side = "left"))
+
+wave1 <- left_join(wave1, inc_w1, by = "COUNTY_FIPS") %>%
+  mutate(current_week_inc_rate = (current_week_incidence / POPESTIMATE2020) * 100000,
+         prev_week_inc_rate = (prev_week_incidence / POPESTIMATE2020) * 100000)
+
+wave2 <- left_join(wave2, inc_w2, by = "COUNTY_FIPS") %>%
+  mutate(current_week_inc_rate = (current_week_incidence / POPESTIMATE2020) * 100000,
+         prev_week_inc_rate = (prev_week_incidence / POPESTIMATE2020) * 100000)
+
+wave3 <- left_join(wave3, inc_w3, by = "COUNTY_FIPS") %>%
+  mutate(current_week_inc_rate = (current_week_incidence / POPESTIMATE2020) * 100000,
+         prev_week_inc_rate = (prev_week_incidence / POPESTIMATE2020) * 100000)
+
+wave4 <- left_join(wave4, inc_w4, by = "COUNTY_FIPS") %>%
+  mutate(current_week_inc_rate = (current_week_incidence / POPESTIMATE2020) * 100000,
+         prev_week_inc_rate = (prev_week_incidence / POPESTIMATE2020) * 100000)
+print(range(wave4$current_week_inc_rate))
+
+wave5 <- left_join(wave5, inc_w5, by = "COUNTY_FIPS") %>%
+  mutate(current_week_inc_rate = (current_week_incidence / POPESTIMATE2021) * 100000,
+         prev_week_inc_rate = (prev_week_incidence / POPESTIMATE2021) * 100000)
+
+wave6 <- left_join(wave6, inc_w6, by = "COUNTY_FIPS") %>%
+  mutate(current_week_inc_rate = (current_week_incidence / POPESTIMATE2021) * 100000,
+         prev_week_inc_rate = (prev_week_incidence / POPESTIMATE2021) * 100000)
+
+#mortality
+wave1 <- left_join(wave1, mort_w1, by = "COUNTY_FIPS") %>%
+  mutate(current_week_mort_rate = (current_week_mortality / POPESTIMATE2020) * 100000,
+         prev_week_mort_rate = (prev_week_mortality / POPESTIMATE2020) * 100000)
+
+wave2 <- left_join(wave2, mort_w2, by = "COUNTY_FIPS") %>%
+  mutate(current_week_mort_rate = (current_week_mortality / POPESTIMATE2020) * 100000,
+         prev_week_mort_rate = (prev_week_mortality / POPESTIMATE2020) * 100000)
+
+wave3 <- left_join(wave3, mort_w3, by = "COUNTY_FIPS") %>%
+  mutate(current_week_mort_rate = (current_week_mortality / POPESTIMATE2020) * 100000,
+         prev_week_mort_rate = (prev_week_mortality / POPESTIMATE2020) * 100000)
+
+wave4 <- left_join(wave4, mort_w4, by = "COUNTY_FIPS") %>%
+  mutate(current_week_mort_rate = (current_week_mortality / POPESTIMATE2020) * 100000,
+         prev_week_mort_rate = (prev_week_mortality / POPESTIMATE2020) * 100000)
+print(range(wave4$current_week_mort_rate))
+
+wave5 <- left_join(wave5, mort_w5, by = "COUNTY_FIPS") %>%
+  mutate(current_week_mort_rate = (current_week_mortality / POPESTIMATE2021) * 100000,
+         prev_week_mort_rate = (prev_week_mortality / POPESTIMATE2021) * 100000)
+
+wave6 <- left_join(wave6, mort_w6, by = "COUNTY_FIPS") %>%
+  mutate(current_week_mort_rate = (current_week_mortality / POPESTIMATE2021) * 100000,
+         prev_week_mort_rate = (prev_week_mortality / POPESTIMATE2021) * 100000)
+
+
+bics_zip_features <- bind_rows(wave1, wave2, wave3, wave4, wave5, wave6)
+
+bics_zip_features <- bics_zip_features %>%
+  distinct(ResponseId, .keep_all = TRUE)
+
+print(sum(is.na(bics_zip_features$COUNTY_FIPS)))
+print(sum(is.na(bics_zip_features$prev_week_inc_rate)))
+print(sum(is.na(bics_zip_features$prev_week_mort_rate)))
+```
+```{r}
+rm(waves, wave2,wave3,wave4,wave5,wave6,inc_w2,inc_w3,inc_w4,inc_w5,inc_w6)
+rm(df_w2,df_w3,df_w4,df_w5,df_w6)
+```
+After looking at the distribution of the incidence rate I noticed it's very right skewed.
+```{r}
+hist(bics_zip_features$prev_week_inc_rate, main="Histogram of Previous Week Incidence Rate",
+     xlab="Previous Week Incidence Rate", breaks=50, col="grey")
+
+hist(bics_zip_features$prev_week_mort_rate, main="Histogram of Previous Week Incidence Rate",
+     xlab="Previous Week Incidence Rate", breaks=50, col="grey")
+```
+I will log this to make it a more normal distribution (a better fit for the linear models we'll be using in the early stage of work). log1p for handling zeros. 
+
+There were about 200 cases where the incidence rate is negative. Probably due to an error in reporting OR something else. For now, I'll drop all of those cases. 
+
+Afterwards, the distribution is still slightly skwewed, but much less so. 
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  filter(current_week_inc_rate > 0)
+
+bics_zip_features <- bics_zip_features %>% 
+  mutate(
+    log_current_week_inc_rate = ifelse(!is.na(current_week_inc_rate) & current_week_inc_rate >= 0, log(current_week_inc_rate + 1), NA_real_),
+    log_prev_week_inc_rate = ifelse(!is.na(prev_week_inc_rate) & prev_week_inc_rate >= 0, log(prev_week_inc_rate + 1), NA_real_),
+    log_current_week_mort_rate = ifelse(!is.na(current_week_mort_rate) & current_week_mort_rate >= 0, log(current_week_mort_rate + 1), NA_real_),
+    log_prev_week_mort_rate = ifelse(!is.na(prev_week_mort_rate) & prev_week_mort_rate >= 0, log(prev_week_mort_rate + 1), NA_real_)
+  )
+
+hist(bics_zip_features$log_current_week_inc_rate, main="Histogram of Logged Previous Week Incidence Rate",
+     xlab="Logged Previous Week Incidence Rate", breaks=50, col="grey")
+
+hist(bics_zip_features$log_current_week_mort_rate, main="Histogram of Logged Previous Week Incidence Rate",
+     xlab="Logged Previous Week Incidence Rate", breaks=50, col="grey")
+```
+Here, I will create an additional variable to calculate the individual's age-specific Infection Fatality Rate (IFR)
+
+According to this paper by Levin et.al (using a meta-regression): https://link.springer.com/article/10.1007/s10654-020-00698-1
+log10(IFR) = -3.27 + 0.0524*age (.007) (0.00013), standard errors in parenthesis
+```{r}
+#better for fitting into the model (if we wanted to do so)
+bics_zip_features$log10_IFR <- -3.27 + 0.0524 * bics_zip_features$age
+#for producing an average by party
+bics_zip_features$IFR <- 10^bics_zip_features$log10_IFR
+
+summary(bics_zip_features$IFR)
+summary(bics_zip_features$age)
+
+age_and_IFR <- bics_zip_features %>% 
+  select(c(political_party, age, IFR))
+
+write.csv(age_and_IFR, "../data/age_IFR_party.csv", row.names = FALSE)
+
+ggplot(bics_zip_features, aes(x = log10_IFR)) +
+  geom_histogram(binwidth = 0.1, fill = "grey", color = "black") +
+  labs(
+    title = "Histogram of log10(IFR)",
+    x = "log10(IFR)",
+    y = "Frequency"
+  )
+
+ggplot(bics_zip_features, aes(x = IFR)) +
+  geom_histogram(binwidth = 0.01, fill = "grey", color = "black") +
+  labs(
+    title = "Histogram of IFR",
+    x = "Infection Fatality Rate (IFR)",
+    y = "Frequency"
+  )
+
+rm(age_and_IFR)
+
+#I'm going with this average just because it's more in line with what we previously had
+average_IFR_by_party <- bics_zip_features %>% 
+  filter(political_party != "Prefer not to answer") %>% 
+  group_by(political_party) %>%
+  summarise(
+    mean_age = mean(age, na.rm = TRUE)
+  ) %>% 
+  mutate(log10_IFR = -3.27 + 0.0524 * mean_age,
+         IFR = 10^log10_IFR)
+
+average_IFR_by_party
+```
+#why not vaccinated binaries
+```{r}
+# create binary variables for each vaccination intent category
+# create binary variables for each vaccination intent category
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    # Individual categories
+    definitely_get_vax = as.integer(covid19_whynot_vax == "Definitely get a vaccine"),
+    probably_get_vax = as.integer(covid19_whynot_vax == "Probably get a vaccine"),
+    probably_not_get_vax = as.integer(covid19_whynot_vax == "Probably NOT get a vaccine"),
+    definitely_not_get_vax = as.integer(covid19_whynot_vax == "Definitely NOT get a vaccine"),
+    
+    # Grouped categories
+    will_get_vax = as.integer(covid19_whynot_vax %in% c("Definitely get a vaccine", "Probably get a vaccine")),
+    will_not_get_vax = as.integer(covid19_whynot_vax %in% c("Probably NOT get a vaccine", "Definitely NOT get a vaccine"))
+  )
+
+# verify the results
+sapply(bics_zip_features[c("will_get_vax", "will_not_get_vax")], sum, na.rm = TRUE)
+```
+
+# Create vax_acceptance: combines vaccination status with vaccination intent
+# This captures vaccine acceptance regardless of access timing
+```{r}
+bics_zip_features <- bics_zip_features %>%
+  mutate(
+    vax_acceptance = case_when(
+      Vaccinated == 1 ~ 1,                           # Already vaccinated = accepting
+      Vaccinated == 0 & will_get_vax == 1 ~ 1,       # Not vaxxed but will = accepting
+      Vaccinated == 0 & will_not_get_vax == 1 ~ 0,   # Not vaxxed and won't = rejecting
+      TRUE ~ NA_real_                                 # Missing data
+    )
+  )
+
+# verify the results
+cat("vax_acceptance counts:\n")
+print(table(bics_zip_features$vax_acceptance, useNA = "ifany"))
+
+# Cross-tabulate with Vaccinated for verification
+cat("\nCross-tabulation: Vaccinated x vax_acceptance:\n")
+print(table(bics_zip_features$Vaccinated, bics_zip_features$vax_acceptance, useNA = "ifany"))
+```
+
+
+# =============================================================================
+# CREATE PARTY-ADJUSTED RAKED WEIGHTS
+# =============================================================================
+# Rake the existing demographic weights to also match national party ID targets
+# from Gallup 2020: 30% Democrat, 29% Republican, 39% Independent
+# Reference: https://news.gallup.com/poll/328310/party-average-2020-winds-similar-prior-years.aspx
+```{r create-party-weights}
+library(survey)
+
+# Define valid parties and target proportions (Gallup 2020, normalized)
+valid_parties <- c("Democrat", "Republican", "Independent")
+gallup_raw <- c(Democrat = 0.30, Republican = 0.29, Independent = 0.39)
+gallup_targets <- gallup_raw / sum(gallup_raw)
+
+# Filter to valid party responses for raking
+bics_for_raking <- bics_zip_features %>%
+  filter(political_party %in% valid_parties) %>%
+  mutate(political_party = factor(political_party, levels = valid_parties))
+
+n_valid <- nrow(bics_for_raking)
+cat("Sample size for raking:", n_valid, "\n")
+
+# Create survey design with existing pooled weights
+svy_design <- svydesign(
+  ids = ~1,
+  weights = ~weight_pooled,
+  data = bics_for_raking
+)
+
+# Define population margins for party ID
+party_pop_margins <- data.frame(
+  political_party = factor(valid_parties, levels = valid_parties),
+  Freq = gallup_targets * n_valid
+)
+
+# Perform raking
+svy_raked <- rake(
+  design = svy_design,
+  sample.margins = list(~political_party),
+  population.margins = list(party_pop_margins),
+  control = list(maxit = 50, epsilon = 1e-6)
+)
+
+cat("Raking converged successfully.\n")
+
+# Extract the raked weights
+bics_for_raking$weight_party_raked <- weights(svy_raked)
+
+# Merge raked weights back to full dataset
+bics_zip_features$row_id <- 1:nrow(bics_zip_features)
+bics_for_raking$row_id <- which(bics_zip_features$political_party %in% valid_parties)
+
+bics_zip_features <- bics_zip_features %>%
+  left_join(
+    bics_for_raking %>% select(row_id, weight_party_raked),
+    by = "row_id"
+  ) %>%
+  mutate(
+    # For non-valid parties, keep original weight
+    weight_party_raked = coalesce(weight_party_raked, weight_pooled)
+  ) %>%
+  select(-row_id)
+
+# Verify
+cat("\nRaked weight summary by party:\n")
+bics_zip_features %>%
+  filter(political_party %in% valid_parties) %>%
+  group_by(political_party) %>%
+  summarise(
+    n = n(),
+    orig_prop = sum(weight_pooled) / sum(bics_zip_features$weight_pooled[bics_zip_features$political_party %in% valid_parties]),
+    raked_prop = sum(weight_party_raked) / sum(bics_zip_features$weight_party_raked[bics_zip_features$political_party %in% valid_parties]),
+    .groups = "drop"
+  ) %>%
+  print()
+
+rm(bics_for_raking, svy_design, svy_raked, party_pop_margins, gallup_raw, gallup_targets, valid_parties, n_valid)
+```
+
+```{r}
+RD_df <- bics_zip_features[bics_zip_features$political_party %in% c("Republican", "Democrat"), ]
+ID_df <- bics_zip_features[bics_zip_features$political_party %in% c("Independent", "Democrat"), ]
+D_df <- subset(bics_zip_features, political_party == "Democrat")
+R_df <- subset(bics_zip_features, political_party == "Republican")
+I_df <- subset(bics_zip_features, political_party == "Independent")
+bics_65_plus = subset(bics_zip_features, age > 64)
+RD_65_plus = subset(RD_df, age > 65)
+ID_65_plus = subset(ID_df, age > 65)
+
+D_df <- subset(D_df, !is.na(D_df$Categorical_Repub_CD_County_Share))
+R_df <- subset(R_df, !is.na(R_df$Categorical_Dem_CD_County_Share))
+
+national_df <- subset(bics_zip_features, city == "National")
+```
+```{r}
+write_csv(bics_zip_features, "../data/BICS_ZIP_Features.csv")
+write_csv(RD_df, "../data/RD_BICS_ZIP_Features.csv")
+write_csv(D_df, "../data/D_BICS_ZIP_Features.csv")
+write_csv(R_df, "../data/R_BICS_ZIP_Features.csv")
+```
+building the df for weekly case counts
+```{r}
+library(lubridate)
+
+dates <- c("June 18-24, '20", "September 12-20, '20", "December 1-7, '20", "February 9-14, '21", "May 14-25, '21")
+dates_formal <- c("2020-06-18", "2020-09-12", "2020-12-01", "2021-02-09", "2021-05-14")
+dates_formal <-ymd(dates_formal)
+
+weekly_cases <- c(693,772,2351,2192,545)
+
+cases_df <- data.frame(wave = dates, weekly_cases = weekly_cases, formal_dates = dates_formal)
+
+cases_df$wave <- factor(cases_df$wave, levels = cases_df$wave)
+
+rm(dates,weekly_cases)
+```
+
+```{r}
+rm(file_type, no_mandates,strict_mandates,less_strict_mandates, unclear_or_unspecified_mandates, i, dates_formal, CD_df, census_pop, census_pop_FIPS, county_CD_share, D_county_CD_share, dem_county_pres, prevalence, prevalence_early_2021, prevalence_late_2020, prevalence_mid_2020, prevalence_mid_2021, prevalence_mid_2021_2, CD_demographics, FULL_ZIPS, col_types, county_pres, county_pres_wide, mask_mandates_count, rep_county_pres, RUC_county_df, State_FIPS_Crosswalk, State_Restrictions_11192020, State_Restrictions_06172020, ZIP_to_CD_df, ZIP_to_County_df, total_votes_by_party, State_Restrictions_df, usafacts_deaths, mort_w2, mort_w3, mort_w4, mort_w5, mort_w6, mortality, mortality_early_2021, mortality_late_2020, mortality_mid_2020, mortality_mid_2021, mortality_mid_2021_2)
+
+rm(df_w1, df_w2, df_w3, df_w4, df_w5, df_w6, df_w0, mortality_early_2020, prevalence_early_2020, inc_w1, mort_w1, wave1)
+
+all_objects <- ls()
+
+# Check if the objects exist and identify data frames
+data_frames <- sapply(all_objects, function(x) {
+  obj <- get(x, envir = .GlobalEnv)
+  is.data.frame(obj)
+})
+
+non_data_frames <- all_objects[!data_frames]
+
+rm(list = non_data_frames, envir = .GlobalEnv)
+
+# Verify removal
+print(ls())
+
+rm(all_objects, data_frames, non_data_frames)
+```
+

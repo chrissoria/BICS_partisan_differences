@@ -1,0 +1,46 @@
+weight_type,comparison,estimate,std.error,p.value,sig,outcome
+Unweighted,Republican - Democrat,1.334,0.172,0,***,Contacts
+Unweighted,Independent - Democrat,0.284,0.178,0.1092,,Contacts
+Unweighted,White - Non-White,1.11,0.181,0,***,Contacts
+Unweighted,Male - Female,0.488,0.149,0.001,**,Contacts
+Unweighted,College - No College,0.43,0.149,0.0039,**,Contacts
+Original,Republican - Democrat,1.25,0.165,0,***,Contacts
+Original,Independent - Democrat,0.392,0.168,0.0196,*,Contacts
+Original,White - Non-White,0.914,0.174,0,***,Contacts
+Original,Male - Female,0.529,0.144,2e-4,***,Contacts
+Original,College - No College,0.551,0.152,3e-4,***,Contacts
+Raked,Republican - Democrat,1.25,0.166,0,***,Contacts
+Raked,Independent - Democrat,0.392,0.168,0.0201,*,Contacts
+Raked,White - Non-White,0.909,0.179,0,***,Contacts
+Raked,Male - Female,0.488,0.146,8e-4,***,Contacts
+Raked,College - No College,0.463,0.156,0.0029,**,Contacts
+Unweighted,Republican - Democrat,-10.791,0.904,0,***,Mask Usage
+Unweighted,Independent - Democrat,-11.72,0.986,0,***,Mask Usage
+Unweighted,White - Non-White,-5.23,1.002,0,***,Mask Usage
+Unweighted,Male - Female,8.313,0.791,0,***,Mask Usage
+Unweighted,College - No College,11.013,0.789,0,***,Mask Usage
+Original,Republican - Democrat,-10.781,0.919,0,***,Mask Usage
+Original,Independent - Democrat,-11.789,0.997,0,***,Mask Usage
+Original,White - Non-White,-6.415,1.007,0,***,Mask Usage
+Original,Male - Female,6.421,0.807,0,***,Mask Usage
+Original,College - No College,10.601,0.838,0,***,Mask Usage
+Raked,Republican - Democrat,-10.781,0.917,0,***,Mask Usage
+Raked,Independent - Democrat,-11.789,0.98,0,***,Mask Usage
+Raked,White - Non-White,-6.609,1.027,0,***,Mask Usage
+Raked,Male - Female,6.891,0.811,0,***,Mask Usage
+Raked,College - No College,10.155,0.849,0,***,Mask Usage
+Unweighted,Republican - Democrat,-0.186,0.022,0,***,Vaccination
+Unweighted,Independent - Democrat,-0.142,0.022,0,***,Vaccination
+Unweighted,White - Non-White,0.043,0.023,0.0676,,Vaccination
+Unweighted,Male - Female,0.103,0.019,0,***,Vaccination
+Unweighted,College - No College,0.256,0.018,0,***,Vaccination
+Original,Republican - Democrat,-0.17,0.022,0,***,Vaccination
+Original,Independent - Democrat,-0.133,0.023,0,***,Vaccination
+Original,White - Non-White,0.061,0.024,0.0123,*,Vaccination
+Original,Male - Female,0.091,0.019,0,***,Vaccination
+Original,College - No College,0.231,0.02,0,***,Vaccination
+Raked,Republican - Democrat,-0.17,0.022,0,***,Vaccination
+Raked,Independent - Democrat,-0.133,0.023,0,***,Vaccination
+Raked,White - Non-White,0.064,0.025,0.0105,*,Vaccination
+Raked,Male - Female,0.104,0.019,0,***,Vaccination
+Raked,College - No College,0.23,0.02,0,***,Vaccination

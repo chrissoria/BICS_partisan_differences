@@ -1,0 +1,405 @@
+---
+title: "03-Waves_Pooled_Behavior_Regressions"
+author: "Christopher Soria"
+date: "2024-01-30"
+output: html_document
+---
+
+# =============================================================================
+# TABLE OF CONTENTS
+# -----------------------------------------------------------------------------
+# 1. SETUP AND CONFIGURATION
+# 2. CONTACTS REGRESSIONS
+# 3. MASK USAGE REGRESSIONS
+# 4. VACCINATION REGRESSIONS
+# 5. COMBINED PLOTS
+# 6. REGRESSION TABLES
+# =============================================================================
+
+# =============================================================================
+# 1. SETUP AND CONFIGURATION
+# =============================================================================
+
+```{r setup, message=FALSE, warning=FALSE}
+library(stargazer)
+library(tidyverse)
+library(emmeans)
+library(cowplot)
+library(broom)
+
+# Source helper functions
+source("plot_helper_functions/regression_helpers.R")
+source("plot_helper_functions/plot_utils.R")
+
+emm_options(rg.limit = 775000)
+dodge_width <- .7
+
+# Load Data
+if (!exists("bics_zip_features")) {
+  if (file.exists("../data/BICS_ZIP_Features.csv")) {
+    bics_zip_features <- read_csv("../data/BICS_ZIP_Features.csv")
+  } else {
+    stop("Data file ../data/BICS_ZIP_Features.csv not found. Please run 00-Prep_BICS_Data.Rmd first.")
+  }
+}
+
+# Calculate averages for emmeans
+average_hhsize <- weighted.mean(bics_zip_features$resp_hhsize, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+average_mort <- weighted.mean(bics_zip_features$log_prev_week_mort_rate, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+average_CD_dem <- weighted.mean(bics_zip_features$CD_PERCENT_DEMOCRAT, w = bics_zip_features$weight_party_raked, na.rm = TRUE)
+```
+
+# =============================================================================
+# 2. CONTACTS REGRESSIONS
+# =============================================================================
+
+
+##Contacts
+```{r contacts}
+# Run nested models and generate emmeans
+contacts_results <- run_nested_models(
+  data = bics_zip_features,
+  outcome_var = "num_cc",
+  average_hhsize = average_hhsize,
+  average_mort = average_mort,
+  average_CD_dem = average_CD_dem
+)
+
+print(summary(contacts_results$model1))
+print(summary(contacts_results$model2))
+print(summary(contacts_results$model3))
+
+# Plot all three models
+rvd_contacts_plot <- plot_emmeans_models(
+  contacts_results$all_emms,
+  title = "predicted number of daily contacts"
+)
+
+rvd_contacts_plot
+
+# Plot model 3 only
+rvd_contacts_plot_emm_3 <- plot_single_model_emmeans(
+  contacts_results$emm3,
+  title = "Number of daily contacts",
+  x_label = "Daily Contacts"
+)
+
+rvd_contacts_plot_emm_3
+
+# Save plots
+ggsave("rvd_contacts_pooled.png", plot = rvd_contacts_plot, path = "../plots/Contacts", width = 12, height = 8, units = "in")
+ggsave("rvd_contacts_pooled_only_two_models.png", plot = rvd_contacts_plot_emm_3, path = "../plots/Contacts", width = 12, height = 8, units = "in")
+```
+
+# =============================================================================
+# 3. MASK USAGE REGRESSIONS
+# =============================================================================
+
+##Mask Usage
+```{r masks}
+# Run nested models and generate emmeans
+masks_results <- run_nested_models(
+  data = bics_zip_features,
+  outcome_var = "Norm_Masks_Used",
+  average_hhsize = average_hhsize,
+  average_mort = average_mort,
+  average_CD_dem = average_CD_dem
+)
+
+print(summary(masks_results$model1))
+print(summary(masks_results$model2))
+print(summary(masks_results$model3))
+
+# Plot all three models
+rvd_masks_plot <- plot_emmeans_models(
+  masks_results$all_emms,
+  title = "Percentage of contacts with a mask"
+)
+
+rvd_masks_plot
+
+# Plot model 3 only
+rvd_masks_plot_emm_3 <- plot_single_model_emmeans(
+  masks_results$emm3,
+  title = "Percent contacts with a mask",
+  x_label = "Mask Usage"
+)
+
+rvd_masks_plot_emm_3
+
+# Save plots
+ggsave("rvd_masks_pooled.png", plot = rvd_masks_plot, path = "../plots/Masks", width = 12, height = 8, units = "in")
+ggsave("rvd_masks_pooled_only_two_models.png", plot = rvd_masks_plot_emm_3, path = "../plots/Masks", width = 12, height = 8, units = "in")
+```
+
+# =============================================================================
+# 4. VACCINATION REGRESSIONS
+# =============================================================================
+
+##Vaccines
+```{r vaccines}
+# Run nested models and generate emmeans
+vaccination_results <- run_nested_models(
+  data = bics_zip_features,
+  outcome_var = "Vaccinated",
+  average_hhsize = average_hhsize,
+  average_mort = average_mort,
+  average_CD_dem = average_CD_dem,
+  include_wave = FALSE
+)
+
+print(summary(vaccination_results$model1))
+print(summary(vaccination_results$model2))
+print(summary(vaccination_results$model3))
+
+# Plot all three models
+rvd_vaccination_plot <- plot_emmeans_models(
+  vaccination_results$all_emms,
+  title = "predicted probability of vaccination"
+)
+
+rvd_vaccination_plot
+
+# Save plot
+ggsave("rvd_vaccination_pooled.png", plot = rvd_vaccination_plot, path = "../plots/Vaccines", width = 12, height = 8, units = "in")
+```
+
+# vaccines only 2 models
+```{r vaccines_model3}
+# Plot model 3 only
+rvd_vaccination_plot_12 <- plot_single_model_emmeans(
+  vaccination_results$emm3,
+  title = "Probability of vaccination",
+  x_label = "Vaccination"
+)
+
+rvd_vaccination_plot_12
+
+ggsave("rvd_vaccination_pooled_12.png",
+  plot = rvd_vaccination_plot_12,
+  path = "../plots/Vaccines",
+  width = 12, height = 8, units = "in"
+)
+```
+
+
+
+# =============================================================================
+# 5. COMBINED PLOTS
+# =============================================================================
+
+##Combined Plot
+```{r}
+legend <- get_legend(
+  rvd_contacts_plot +
+    theme(
+      legend.position = "bottom",
+      legend.text = element_text(size = 20),
+      legend.title = element_text(size = 20),
+      legend.margin = margin(t = 10, r = 10, b = 10, l = 10)
+    )
+)
+
+combined_plot <- plot_grid(
+  plot_grid(rvd_contacts_plot + theme(legend.position = "none"),
+    rvd_masks_plot + theme(legend.position = "none"),
+    rvd_vaccination_plot + theme(legend.position = "none"),
+    ncol = 1, labels = c("A", "B", "C")
+  ),
+  legend,
+  ncol = 1,
+  rel_heights = c(1, 0.1) # Adjust the relative height of the legend
+)
+
+combined_plot <- plot_grid(
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.4, 10)
+)
+
+ggsave("combined_national_pooled.png", plot = combined_plot, path = "../out/plots", width = 12, height = 14, units = "in")
+
+combined_plot
+
+rm(combined_plot, rvd_contacts_plot, rvd_masks_plot, rvd_vaccination_plot, legend)
+```
+# Combined plot with only model 3
+```{r}
+legend <- get_legend_35(
+  rvd_contacts_plot_emm_3 +
+    theme(
+      legend.position = "bottom",
+      legend.text = element_text(size = 20),
+      legend.title = element_text(size = 20),
+      legend.margin = margin(t = 10, r = 10, b = 10, l = 10)
+    )
+)
+
+combined_plot <- plot_grid(
+  plot_grid(rvd_contacts_plot_emm_3 + theme(legend.position = "none"),
+    rvd_masks_plot_emm_3 + theme(legend.position = "none"),
+    rvd_vaccination_plot_12 + theme(legend.position = "none"),
+    ncol = 3, labels = c("A", "B", "C")
+  ),
+  legend,
+  ncol = 1,
+  rel_heights = c(1, 0.1)
+)
+
+combined_plot <- plot_grid(
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.4, 10)
+)
+
+ggsave("combined_national_pooled_two_mdoels.png", plot = combined_plot, path = "../out/plots", width = 16, height = 6, units = "in")
+
+combined_plot
+
+# rm(combined_plot, rvd_contacts_plot_emm_3, rvd_masks_plot_emm_3, rvd_vaccination_plot_12, legend)
+```
+
+
+
+# =============================================================================
+# 6. REGRESSION TABLES
+# =============================================================================
+
+#Combined Tables
+```{r}
+custom_labels <- c(
+  "political_partyIndependent" = "Independent Party (ref: Democrat)",
+  "political_partyRepublican" = "Republican Party (ref: Democrat)",
+  "political_partyPrefer not to answer" = "Prefer Not to Answer (ref: Democrat)",
+  "wave2" = "Wave 2 (ref: Wave 1)",
+  "wave3" = "Wave 3 (ref: Wave 1)",
+  "wave4" = "Wave 4  (ref: Wave 1)",
+  "wave5" = "Wave 5  (ref: Wave 1)",
+  "wave6" = "Wave 6  (ref: Wave 1)",
+  "interview_day_weekendWeekend" = "Weekend Interview",
+  "age_group[30,45)" = "Age Group: [30,45) (ref: [18,30)",
+  "age_group[45,55)" = "Age Group: [45,55) (ref: [18,30)",
+  "age_group[55,65)" = "Age Group: [55,65) (ref: [18,30)",
+  "age_group[65,100]" = "Age Group: [65,100] (ref: [18,30)",
+  "r_raceBlack" = "Race: Black (ref: White)",
+  "r_raceAsian" = "Race: Asian (ref: White)",
+  "r_raceOther / Mixed" = "Race: Other/Mixed (ref: White)",
+  "resp_hispanic.L" = "Hispanic",
+  "r_male1" = "Male",
+  "resp_educHigh school graduate" = "High School Graduate (ref: College Grad)",
+  "resp_educLess than high school" = "Less than High School (ref: College Grad)",
+  "r_workingWorking" = "Employed",
+  "resp_hhsize" = "Household Size",
+  "r_metro1" = "Metro Area",
+  "CD_PERCENT_DEMOCRAT" = "CD Percent Democrat",
+  "log_prev_week_mort_rate" = "Log Previous Week Incidence Rate",
+  "county_mask_mandateLess Strict" = "Less Strict Mask Mandate (ref: Strict Mandate)",
+  "county_mask_mandateUnspecified or Unclear Mandate" = "Unspecified Mask Mandate (ref: Strict Mandate)",
+  "county_mask_mandateNo Mandate" = "No Mask Mandate (ref: Strict Mandate)",
+  "Constant" = "Constant"
+)
+
+custom_labels_vaccines <- c(
+  "political_partyIndependent" = "Independent Party (ref: Democrat)",
+  "political_partyRepublican" = "Republican Party (ref: Democrat)",
+  "political_partyPrefer not to answer" = "Prefer Not to Answer (ref: Democrat)",
+  "interview_day_weekendWeekend" = "Weekend Interview",
+  "age_group[30,45)" = "Age Group: [30,45) (ref: [18,30)",
+  "age_group[45,55)" = "Age Group: [45,55) (ref: [18,30)",
+  "age_group[55,65)" = "Age Group: [55,65) (ref: [18,30)",
+  "age_group[65,100]" = "Age Group: [65,100] (ref: [18,30)",
+  "r_raceBlack" = "Race: Black (ref: White)",
+  "r_raceAsian" = "Race: Asian (ref: White)",
+  "r_raceOther / Mixed" = "Race: Other/Mixed (ref: White)",
+  "resp_hispanic.L" = "Hispanic",
+  "r_male1" = "Male",
+  "resp_educHigh school graduate" = "High School Graduate (ref: College Grad)",
+  "resp_educLess than high school" = "Less than High School (ref: College Grad)",
+  "r_workingWorking" = "Employed",
+  "resp_hhsize" = "Household Size",
+  "r_metro1" = "Metro Area",
+  "CD_PERCENT_DEMOCRAT" = "CD Percent Democrat",
+  "log_prev_week_mort_rate" = "Log Previous Week Incidence Rate",
+  "county_mask_mandateLess Strict" = "Less Strict Mask Mandate (ref: Strict Mandate)",
+  "county_mask_mandateUnspecified or Unclear Mandate" = "Unspecified Mask Mandate (ref: Strict Mandate)",
+  "county_mask_mandateNo Mandate" = "No Mask Mandate (ref: Strict Mandate)",
+  "Constant" = "Constant"
+)
+
+reference_lines <- list(
+  c("Reference Categories", ""),
+  c("Political Party", "Democrat"),
+  c("Male", "Non-Male"),
+  c("Wave", "Wave 2"),
+  c("Weekend Interview", "Weekday Interview"),
+  c("Education", "College Graduate"),
+  c("Employed", "Not Employed"),
+  c("Metro Area", "Non-Metro Area"),
+  c("County Mask Mandate", "Strict"),
+  c("\\hline", "") # Add a horizontal line after reference categories
+)
+
+reference_lines_vaccines <- list(
+  c("reference categories", ""),
+  c("political party", "democrat"),
+  c("male", "non-male"),
+  c("weekend interview", "weekday interview"),
+  c("education", "college graduate"),
+  c("employed", "not employed"),
+  c("metro area", "non-metro area"),
+  c("county mask mandate", "strict"),
+  c("\\hline", "")
+)
+
+stargazer(contacts_results$model1, contacts_results$model2, contacts_results$model3,
+  type = "latex",
+  title = "Association between Political Party and the Number of Reported Contacts",
+  align = TRUE,
+  no.space = TRUE,
+  covariate.labels = custom_labels,
+  omit = c("STATE", "city"),
+  column.labels = c("Model 1", "Model 2", "Model 3"),
+  dep.var.labels = "Total Contacts",
+  notes = "\\footnotesize",
+  out = "../plots/tables/contacts_regression_results.tex"
+)
+
+
+stargazer(masks_results$model1, masks_results$model2, masks_results$model3,
+  type = "latex",
+  title = "Association between Political Party and Reported Percentage of Contacts with a Mask",
+  align = TRUE,
+  no.space = TRUE,
+  covariate.labels = custom_labels,
+  omit = c("STATE", "city"),
+  dep.var.labels = "Percentage of Contacts with a Mask",
+  notes = "\\footnotesize",
+  out = "../plots/tables/masks_regression_results.tex"
+)
+
+
+suppressWarnings(
+  stargazer(vaccination_results$model1, vaccination_results$model2, vaccination_results$model3,
+    type = "latex",
+    title = "Association between Political Party and Reported Vaccination",
+    align = TRUE,
+    no.space = TRUE,
+    covariate.labels = custom_labels_vaccines,
+    omit = c("STATE", "city"),
+    column.labels = c("Model 1", "Model 2", "Model 3"),
+    dep.var.labels = "Probability of Vaccination",
+    notes = "\\footnotesize",
+    out = "../plots/tables/vaccines_regression_results.tex"
+  )
+)
+
+
+# Cleanup
+rm(contacts_results, masks_results, vaccination_results)
+rm(rvd_contacts_plot, rvd_masks_plot, rvd_vaccination_plot)
+rm(rvd_contacts_plot_emm_3, rvd_masks_plot_emm_3, rvd_vaccination_plot_12)
+```
+```{r cleanup}
+rm(average_CD_dem, average_hhsize, average_mort, dodge_width, custom_labels, custom_labels_vaccines, reference_lines)
+```
+

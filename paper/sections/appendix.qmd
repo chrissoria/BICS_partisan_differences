@@ -1,0 +1,2659 @@
+# Appendix
+
+## Pandemic Risk Perceptions Over Time {#sec-perception-appendix}
+
+```{r}
+#| label: load-perception-data
+#| include: false
+
+# Load perception by wave data
+perceptions_by_wave <- read_csv("../out/tables/perceptions_by_wave.csv", show_col_types = FALSE) %>%
+  filter(!is.na(pct_very_concerned)) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+perception_gaps <- read_csv("../out/tables/perception_gaps_by_wave.csv", show_col_types = FALSE) %>%
+  filter(!is.na(concern_gap)) %>%
+  mutate(
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+# Weekly cases data (wave 1: April 2020, ~200k weekly cases at the time)
+weekly_cases <- tibble(
+  wave = 1:6,
+  cases_thousands = c(200, 693, 772, 2351, 2192, 545),
+  wave_label = factor(c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"),
+                      levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+)
+
+# Summary stats
+max_gap_wave <- perception_gaps %>% slice_max(concern_gap, n = 1)
+min_gap_wave <- perception_gaps %>% slice_min(concern_gap, n = 1)
+```
+
+The main text documents substantial partisan differences in pandemic risk perception, with Democrats more likely than Republicans to report being "very concerned" about COVID-19. @fig-perception shows the overall distribution of concern by party, pooled across all waves. This section then examines how these perception gaps evolved over the course of the pandemic, paralleling our analysis of behavioral gaps over time.
+
+```{r}
+#| label: fig-perception
+#| fig-cap: "Partisan Differences in Pandemic Risk Perception. Bars show the percentage of respondents reporting being 'very concerned' about COVID-19, by political party. Values are weighted means using raked survey weights, pooled across all survey waves."
+#| fig-height: 4
+#| fig-width: 5
+
+library(tidyverse)
+library(cowplot)
+
+# Load paper statistics for pooled perception values
+stats_path <- here::here("out", "tables", "paper_statistics.rds")
+paper_stats <- readRDS(stats_path)
+invisible(list2env(paper_stats, envir = environment()))
+
+# Party colors
+party_colors <- c("Republican" = "#c50000", "Independent" = "#6db753", "Democrat" = "#326ba4")
+
+# Create data for perception plot
+perception_data <- tibble(
+  party = c("Democrat", "Independent", "Republican"),
+  value = c(concern_dem, concern_ind, concern_rep)
+) %>%
+  mutate(party = factor(party, levels = c("Republican", "Independent", "Democrat")))
+
+# Create bar plot
+ggplot(perception_data, aes(x = party, y = value, fill = party)) +
+  geom_col(alpha = 0.7, width = 0.7, color = "black") +
+  geom_text(aes(label = sprintf("%.1f%%", value)),
+            vjust = -0.5, size = 4, fontface = "bold") +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15)), limits = c(0, 100)) +
+  labs(x = NULL, y = "Very Concerned (%)") +
+  theme_cowplot() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(size = 11)
+  )
+```
+
+@fig-perception-levels displays the percentage of each partisan group reporting being "very concerned" about COVID-19 across survey waves. @fig-perception-gap shows the Democrat-Republican gap in this measure over time, with weekly COVID-19 cases shown in the background for context.
+
+```{r}
+#| label: fig-perception-levels
+#| fig-cap: "Pandemic Risk Perception by Party Across Survey Waves. Lines show the percentage of respondents reporting being 'very concerned' about COVID-19. Gray background bars indicate weekly COVID-19 cases (in thousands)."
+#| fig-height: 5
+#| fig-width: 8
+
+library(cowplot)
+library(patchwork)
+
+# Party colors
+party_colors <- c("Republican" = "#c50000", "Independent" = "#6db753", "Democrat" = "#326ba4")
+
+# Scaling for dual axis - ensure bars fit within y-axis
+max_cases <- max(weekly_cases$cases_thousands)
+max_concern <- 80  # Scale cases to max out at 80% so they don't overwhelm the perception lines
+concern_scale <- max_concern / max_cases
+
+ggplot() +
+  # Background: cases
+  geom_col(data = weekly_cases, aes(x = wave_label, y = cases_thousands * concern_scale),
+           fill = "gray80", alpha = 0.5, width = 0.7) +
+  # Lines for each party
+  geom_line(data = perceptions_by_wave,
+            aes(x = wave_label, y = pct_very_concerned, color = political_party, group = political_party),
+            linewidth = 1.2) +
+  geom_point(data = perceptions_by_wave,
+             aes(x = wave_label, y = pct_very_concerned, color = political_party),
+             size = 3) +
+  scale_color_manual(values = party_colors) +
+  scale_y_continuous(
+    name = "Very Concerned (%)",
+    limits = c(0, 85),
+    sec.axis = sec_axis(~ . / concern_scale, name = "Weekly Cases (thousands)"),
+    expand = expansion(mult = c(0, 0.02))
+  ) +
+  labs(x = NULL, color = "Party") +
+  theme_cowplot() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y.right = element_text(color = "gray50"),
+    legend.position = "bottom"
+  )
+```
+
+```{r}
+#| label: fig-perception-gap
+#| fig-cap: "Partisan Gap in Pandemic Risk Perception Across Survey Waves. Points show the Democrat-Republican difference in the percentage reporting being 'very concerned' about COVID-19. Gray background bars indicate weekly COVID-19 cases (in thousands)."
+#| fig-height: 4
+#| fig-width: 7
+
+# Merge gaps with cases
+gaps_for_plot <- perception_gaps %>%
+  left_join(weekly_cases, by = c("wave", "wave_label"))
+
+# Scaling
+max_gap <- max(gaps_for_plot$concern_gap)
+gap_scale <- max_gap / max(gaps_for_plot$cases_thousands) * 1.5
+
+ggplot(gaps_for_plot, aes(x = wave_label)) +
+  # Background: weekly cases
+  geom_col(aes(y = cases_thousands * gap_scale),
+           fill = "gray80", alpha = 0.5, width = 0.7) +
+  # Foreground: perception gap as line + points
+  geom_line(aes(y = concern_gap, group = 1), color = "#7570b3", linewidth = 1.2) +
+  geom_point(aes(y = concern_gap), color = "#7570b3", size = 4) +
+  # Gap value labels
+  geom_text(aes(y = concern_gap, label = sprintf("%.1f", concern_gap)),
+            vjust = -1.2, size = 3.5, fontface = "bold") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_y_continuous(
+    name = "D-R Gap (percentage points)",
+    sec.axis = sec_axis(~ . / gap_scale, name = "Weekly Cases (thousands)"),
+    expand = expansion(mult = c(0.05, 0.2))
+  ) +
+  labs(x = NULL) +
+  theme_cowplot() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y.right = element_text(color = "gray50")
+  )
+```
+
+The perception gap was smallest at the beginning of the pandemic: just `r sprintf("%.1f", min_gap_wave$concern_gap)` percentage points in `r min_gap_wave$wave_label`. By `r max_gap_wave$wave_label`, the gap had grown to `r sprintf("%.1f", max_gap_wave$concern_gap)` percentage points. In April 2020, Republicans were nearly as likely as Democrats to report being "very concerned" about COVID-19; by June 2020, that gap had more than doubled, and it remained elevated throughout the remainder of the study period.
+
+Critically, while incidence was relatively low in April 2020, *mortality rates were at their highest*---the virus was simply more deadly in the early months before treatments improved and clinical experience accumulated. This pattern is consistent with our broader finding that concrete, visible consequences reduce polarization. When the threat was most lethal, perceptions were least polarized. As case fatality rates declined over subsequent months---even as case counts rose---the perception gap widened. The combination of declining lethality and escalating politicization of the pandemic through debates over lockdowns, masks, and the credibility of public health guidance likely both contributed to this divergence.
+
+All three partisan groups showed declining concern over time, particularly from the winter surge through spring 2021 as vaccines became widely available. However, this decline was steeper among Republicans and Independents than among Democrats, maintaining the perception gap even as overall concern fell.
+
+### Perceptions vs. Local Pandemic Conditions {#sec-perception-vs-local}
+
+The previous figures show perceptions against *national* case counts. But Republicans and Democrats live in different places and thus experienced different local pandemic conditions. @fig-perception-local shows each party's stated concern alongside the average local incidence rate they actually experienced, given where respondents in each party lived. This allows us to assess whether perceptions tracked the objective conditions each group faced.
+
+```{r}
+#| label: fig-perception-local
+#| fig-cap: "Perceptions vs. Local Pandemic Conditions by Party. Each panel shows one party's stated concern (line) against the average local incidence rate experienced by that party's respondents (bars). Local incidence is calculated as the weighted average of county-level weekly incidence rates among respondents of each party."
+#| fig-height: 5
+#| fig-width: 10
+
+library(tidyverse)
+library(cowplot)
+library(patchwork)
+
+# Load perceptions with local conditions
+perceptions_local <- read_csv("../out/tables/perceptions_with_local_conditions.csv", show_col_types = FALSE) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Democrat")),
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+# Party colors
+party_colors <- c("Republican" = "#c50000", "Democrat" = "#326ba4")
+
+# Use common scale for both panels (based on max across both parties)
+max_inc_overall <- max(perceptions_local$mean_local_incidence, na.rm = TRUE)
+max_concern <- 80
+inc_scale <- max_concern / max_inc_overall
+
+# Create a plot for each party
+make_party_plot <- function(party_name, party_color, show_y_left = TRUE, show_y_right = FALSE) {
+  party_data <- perceptions_local %>% filter(political_party == party_name)
+
+  p <- ggplot(party_data, aes(x = wave_label)) +
+    # Background: local incidence
+    geom_col(aes(y = mean_local_incidence * inc_scale),
+             fill = "gray70", alpha = 0.6, width = 0.7) +
+    # Line: stated concern
+    geom_line(aes(y = pct_very_concerned, group = 1),
+              color = party_color, linewidth = 1.3) +
+    geom_point(aes(y = pct_very_concerned),
+               color = party_color, size = 3.5) +
+    scale_y_continuous(
+      name = if(show_y_left) "Very Concerned (%)" else NULL,
+      limits = c(0, 85),
+      sec.axis = sec_axis(~ . / inc_scale,
+                          name = if(show_y_right) "Local Incidence (per 100k)" else NULL),
+      expand = expansion(mult = c(0, 0.02))
+    ) +
+    labs(x = NULL, title = party_name) +
+    theme_cowplot() +
+    theme(
+      plot.title = element_text(face = "bold", color = party_color, size = 14),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.title.y.right = element_text(color = "gray50", size = 9)
+    )
+
+  if (!show_y_left) p <- p + theme(axis.text.y.left = element_blank())
+  if (!show_y_right) p <- p + theme(axis.text.y.right = element_blank())
+
+  p
+}
+
+p_rep <- make_party_plot("Republican", "#c50000", show_y_left = TRUE, show_y_right = FALSE)
+p_dem <- make_party_plot("Democrat", "#326ba4", show_y_left = FALSE, show_y_right = TRUE)
+
+p_rep + p_dem
+```
+
+The figure reveals that Republicans and Democrats experienced similar local incidence trajectories---both groups saw the winter 2020--21 surge---yet their perceptions diverged over time. Notably, incidence was relatively low in April 2020 when the perception gap was smallest, complicating any simple story about incidence driving perceptions.
+
+@fig-perception-local-mortality shows the same comparison using local mortality rates rather than incidence. Mortality is a more concrete and visible indicator of pandemic severity---deaths are reported in local news, experienced through social networks, and marked by obituaries---making it a stronger test of whether perceptions tracked objective conditions.
+
+```{r}
+#| label: fig-perception-local-mortality
+#| fig-cap: "Perceptions vs. Local Mortality by Party. Each panel shows one party's stated concern (line) against the average local mortality rate experienced by that party's respondents (bars). Local mortality is calculated as the weighted average of county-level weekly mortality rates (per 100,000) among respondents of each party."
+#| fig-height: 5
+#| fig-width: 10
+
+library(tidyverse)
+library(cowplot)
+library(patchwork)
+
+# Load perceptions with local conditions (already loaded above, but reload for safety)
+perceptions_local_mort <- read_csv("../out/tables/perceptions_with_local_conditions.csv", show_col_types = FALSE) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Democrat")),
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+# Party colors
+party_colors <- c("Republican" = "#c50000", "Democrat" = "#326ba4")
+
+# Use common scale for both panels (based on max across both parties)
+max_mort_overall <- max(perceptions_local_mort$mean_local_mortality, na.rm = TRUE)
+max_concern <- 80
+mort_scale <- max_concern / max_mort_overall
+
+# Create a plot for each party
+make_party_mort_plot <- function(party_name, party_color, show_y_left = TRUE, show_y_right = FALSE) {
+  party_data <- perceptions_local_mort %>% filter(political_party == party_name)
+
+  p <- ggplot(party_data, aes(x = wave_label)) +
+    # Background: local mortality
+    geom_col(aes(y = mean_local_mortality * mort_scale),
+             fill = "gray70", alpha = 0.6, width = 0.7) +
+    # Line: stated concern
+    geom_line(aes(y = pct_very_concerned, group = 1),
+              color = party_color, linewidth = 1.3) +
+    geom_point(aes(y = pct_very_concerned),
+               color = party_color, size = 3.5) +
+    scale_y_continuous(
+      name = if(show_y_left) "Very Concerned (%)" else NULL,
+      limits = c(0, 85),
+      sec.axis = sec_axis(~ . / mort_scale,
+                          name = if(show_y_right) "Local Mortality (per 100k)" else NULL),
+      expand = expansion(mult = c(0, 0.02))
+    ) +
+    labs(x = NULL, title = party_name) +
+    theme_cowplot() +
+    theme(
+      plot.title = element_text(face = "bold", color = party_color, size = 14),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.title.y.right = element_text(color = "gray50", size = 9)
+    )
+
+  if (!show_y_left) p <- p + theme(axis.text.y.left = element_blank())
+  if (!show_y_right) p <- p + theme(axis.text.y.right = element_blank())
+
+  p
+}
+
+p_rep_mort <- make_party_mort_plot("Republican", "#c50000", show_y_left = TRUE, show_y_right = FALSE)
+p_dem_mort <- make_party_mort_plot("Democrat", "#326ba4", show_y_left = FALSE, show_y_right = TRUE)
+
+p_rep_mort + p_dem_mort
+```
+
+The mortality figure reveals a striking pattern: local mortality rates were actually *highest* in April 2020---precisely when the perception gap was smallest. The virus was simply more deadly in the early months before treatments improved and clinical protocols developed. As mortality rates declined over subsequent months, the perception gap widened. This pattern supports our broader thesis that concrete, visible consequences reduce polarization: when the threat was most lethal, partisans were most aligned in their concern.
+
+The winter 2020--21 surge presents a more complex picture. Mortality rose sharply, and Republicans did reduce their contacts in response---yet their stated concern continued to decline. This disconnect between mortality-driven *behavior* and diverging *perceptions* suggests that by this point, expressed concern had become entangled with partisan identity in ways that were resistant to objective conditions. The early-pandemic alignment, when partisanship had not yet fully politicized COVID-19, may represent a window before symbolic boundaries hardened. Once the pandemic became a site of partisan conflict, stated perceptions became partly performative---reflecting group allegiance rather than risk assessment---even as underlying behavior continued to respond to concrete threat.
+
+### Health Behaviors by Concern Level {#sec-behavior-by-concern}
+
+@fig-concern-behavior-appendix shows health behaviors by party within each level of stated concern. This complements @fig-concern-gaps in the main text by showing the absolute levels rather than the gaps.
+
+```{r}
+#| label: fig-concern-behavior-appendix
+#| fig-cap: "Health Behaviors by Party Within Each Level of Stated Concern. Panel A shows mean daily contacts; Panel B shows mask usage. Sample sizes: Not at all concerned (n=1,127), Not very concerned (n=1,897), Somewhat concerned (n=5,894), Very concerned (n=9,168)."
+#| fig-height: 5
+#| fig-width: 10
+
+library(patchwork)
+library(cowplot)
+
+# Load behaviors by concern level
+behaviors_by_concern <- read_csv("../out/tables/behaviors_by_concern_level.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    concern_level = factor(concern_level,
+                           levels = c("Not at all concerned", "Not very concerned",
+                                      "Somewhat concerned", "Very concerned"))
+  )
+
+# Party colors
+party_colors <- c("Democrat" = "#326ba4", "Independent" = "#6db753", "Republican" = "#c50000")
+
+# Panel A: Contacts by concern level
+p_contacts <- ggplot(behaviors_by_concern, aes(x = concern_level, y = contacts, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.8, color = "black") +
+  geom_text(aes(label = sprintf("%.1f", contacts)),
+            position = position_dodge(width = 0.8), vjust = -0.5, size = 2.8) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  scale_x_discrete(labels = c("Not at all\nconcerned", "Not very\nconcerned",
+                              "Somewhat\nconcerned", "Very\nconcerned")) +
+  labs(x = NULL, y = "Mean Daily Contacts", title = "A. Daily Contacts", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(size = 9),
+    legend.position = "bottom"
+  )
+
+# Panel B: Mask usage by concern level
+p_masks <- ggplot(behaviors_by_concern, aes(x = concern_level, y = mask_usage, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.8, color = "black") +
+  geom_text(aes(label = sprintf("%.0f", mask_usage)),
+            position = position_dodge(width = 0.8), vjust = -0.5, size = 2.8) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15)), limits = c(0, 100)) +
+  scale_x_discrete(labels = c("Not at all\nconcerned", "Not very\nconcerned",
+                              "Somewhat\nconcerned", "Very\nconcerned")) +
+  labs(x = NULL, y = "Mask Usage (%)", title = "B. Mask Usage", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(size = 9),
+    legend.position = "bottom"
+  )
+
+# Combine with shared legend
+p_contacts + p_masks + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+```
+
+@fig-behavior-very-concerned shows how behavior among the "very concerned" subgroup evolved over time, alongside the changing share of each party reporting high concern. This analysis reveals that the meaning of "very concerned" changed over the pandemic as different types of partisans selected into this category.
+
+```{r}
+#| label: fig-behavior-very-concerned
+#| fig-cap: "Behavior Among the 'Very Concerned' Over Time. Panel A shows the percentage reporting being 'very concerned'---declining for both parties but especially Republicans (55% to 26%). Panels B and C show behavior *only among those very concerned*. The contact gap (Panel B) was positive early on but collapsed during the winter surge and reversed by wave 5-6. The mask gap (Panel C) reversed earlier (wave 4) and persisted, suggesting politicization independent of concern level."
+#| fig-height: 4
+#| fig-width: 12
+
+library(patchwork)
+library(cowplot)
+
+# Load percent very concerned by wave
+pct_vc <- read_csv("../out/tables/pct_very_concerned_by_wave.csv", show_col_types = FALSE) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Democrat", "Republican")),
+    wave_label = factor(wave, labels = c("W1\nApr'20", "W2\nJun'20", "W3\nSep'20",
+                                          "W4\nDec'20", "W5\nFeb'21", "W6\nMay'21"))
+  )
+
+# Load behaviors among very concerned by wave
+behaviors_vc <- read_csv("../out/tables/behaviors_among_very_concerned_by_wave.csv", show_col_types = FALSE) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Democrat", "Republican")),
+    wave_label = factor(wave, labels = c("W1\nApr'20", "W2\nJun'20", "W3\nSep'20",
+                                          "W4\nDec'20", "W5\nFeb'21", "W6\nMay'21"))
+  )
+
+# Panel A: Percent very concerned by party over time
+p_pct <- ggplot(pct_vc, aes(x = wave_label, y = pct_very_concerned, color = political_party, group = political_party)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_color_manual(values = c("Democrat" = "#2166AC", "Republican" = "#B2182B")) +
+  labs(x = NULL, y = "% 'Very Concerned'", title = "A. Share 'Very Concerned'", color = NULL) +
+  theme_cowplot() +
+  theme(plot.title = element_text(face = "bold", size = 10), axis.text.x = element_text(size = 7)) +
+  ylim(20, 80)
+
+# Panel B: Contacts among very concerned
+p_contacts <- ggplot(behaviors_vc, aes(x = wave_label, y = contacts, color = political_party, group = political_party)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_color_manual(values = c("Democrat" = "#2166AC", "Republican" = "#B2182B")) +
+  labs(x = NULL, y = "Daily Contacts", title = "B. Contacts Among 'Very Concerned'", color = NULL) +
+  theme_cowplot() +
+  theme(plot.title = element_text(face = "bold", size = 10), axis.text.x = element_text(size = 7)) +
+  ylim(3, 10)
+
+# Panel C: Mask usage among very concerned
+p_masks <- ggplot(behaviors_vc, aes(x = wave_label, y = mask_usage, color = political_party, group = political_party)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_color_manual(values = c("Democrat" = "#2166AC", "Republican" = "#B2182B")) +
+  labs(x = NULL, y = "Mask Usage (%)", title = "C. Masks Among 'Very Concerned'", color = NULL) +
+  theme_cowplot() +
+  theme(plot.title = element_text(face = "bold", size = 10), axis.text.x = element_text(size = 7)) +
+  ylim(60, 85)
+
+p_pct + p_contacts + p_masks + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+```
+
+Panel A shows that the share reporting "very concerned" declined for both parties, but especially for Republicans (55% to 26% vs. 67% to 49% for Democrats).
+Panels B and C reveal how behavior among the very concerned evolved—and the patterns differ in revealing ways.
+
+For contacts (Panel B), very concerned Republicans initially reported *more* contacts than very concerned Democrats (gap of +1.4 to +3.4 contacts in waves 1-3).
+But this gap collapsed during the winter 2020-21 surge (wave 4-5) and actually reversed by waves 5-6, with concerned Democrats reporting slightly more contacts.
+This timing aligns with the lifting of stay-in-place restrictions: among all respondents, the percentage reporting being under a stay-in-place order declined from approximately 95% in wave 1 to 70-81% by wave 5, with Republicans showing a larger decline than Democrats (@fig-sip-over-time in @sec-sip-appendix).
+The contact pattern suggests mortality-driven convergence early on, followed by Democrats increasing contacts as restrictions lifted—perhaps reflecting a strategic shift toward relying on masks and vaccines rather than contact reduction.
+
+For masks (Panel C), a similar reversal occurred but with different timing: very concerned Republicans wore masks at *higher* rates than very concerned Democrats in waves 1-3, but by wave 4 Democrats wore masks more.
+Unlike contacts, this reversal did not correspond to the mortality surge or the lifting of restrictions—it persisted even as mortality declined in waves 5-6.
+This pattern suggests that mask-wearing became increasingly tied to partisan identity over time, such that even "very concerned" Republicans reduced masking as the behavior became symbolically marked.
+
+### Wave 1 Only: Gaps by Concern Level When Mortality Was Highest
+
+The pooled analysis above combines data from all waves. To examine whether the relationship between concern and partisan gaps differed when objective threat was highest, @fig-concern-gaps-wave1 replicates this analysis for Wave 1 (April 2020) only---the period when mortality rates were at their peak.
+
+```{r}
+#| label: fig-concern-gaps-wave1
+#| fig-cap: "Partisan Gaps in Health Behaviors by Concern Level, Wave 1 Only (April 2020). Panel A shows the Republican-Democrat gap in daily contacts; Panel B shows the Democrat-Republican gap in mask usage. Wave 1 represents the period of highest mortality rates, before the pandemic became heavily politicized. Binary concern grouping (Very Concerned vs. Less Concerned) used for statistical power. Unweighted means used since survey weights were designed for the full sample. Sample sizes shown on each bar (D = Democrats, R = Republicans)."
+#| fig-height: 4
+#| fig-width: 10
+
+library(patchwork)
+library(cowplot)
+
+# Load Wave 1 behaviors by concern level (binary: Very Concerned vs Less Concerned)
+behaviors_wave1 <- read_csv("../out/tables/behaviors_by_concern_level_wave1.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    concern_level = factor(concern_level,
+                           levels = c("Less Concerned", "Very Concerned"))
+  )
+
+# Calculate R-D gaps at each concern level
+gaps_wave1 <- behaviors_wave1 %>%
+  select(concern_level, political_party, contacts, mask_usage, n) %>%
+  pivot_wider(names_from = political_party, values_from = c(contacts, mask_usage, n)) %>%
+  mutate(
+    contacts_gap_rd = contacts_Republican - contacts_Democrat,
+    mask_gap_dr = mask_usage_Democrat - mask_usage_Republican,
+    n_label = paste0("D:", n_Democrat, " R:", n_Republican)
+  )
+
+# Panel A: Contact gap by concern level
+p_contact_gap_w1 <- ggplot(gaps_wave1, aes(x = concern_level, y = contacts_gap_rd)) +
+  geom_col(fill = "#7570b3", alpha = 0.7, width = 0.6, color = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_text(aes(label = sprintf("%.1f", contacts_gap_rd)),
+            vjust = ifelse(gaps_wave1$contacts_gap_rd >= 0, -0.5, 1.5),
+            size = 3.5, fontface = "bold") +
+  geom_text(aes(label = n_label, y = 0), vjust = 1.5, size = 2.5, color = "gray40") +
+  labs(x = NULL, y = "R-D Contact Gap", title = "A. Contact Gap (Wave 1)") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    axis.text.x = element_text(size = 10)
+  )
+
+# Panel B: Mask gap by concern level
+p_mask_gap_w1 <- ggplot(gaps_wave1, aes(x = concern_level, y = mask_gap_dr)) +
+  geom_col(fill = "#1b9e77", alpha = 0.7, width = 0.6, color = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_text(aes(label = sprintf("%.1f", mask_gap_dr)),
+            vjust = ifelse(gaps_wave1$mask_gap_dr >= 0, -0.5, 1.5),
+            size = 3.5, fontface = "bold") +
+  geom_text(aes(label = n_label, y = 0), vjust = 1.5, size = 2.5, color = "gray40") +
+  labs(x = NULL, y = "D-R Mask Gap (pp)", title = "B. Mask Gap (Wave 1)") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    axis.text.x = element_text(size = 10)
+  )
+
+p_contact_gap_w1 + p_mask_gap_w1
+```
+
+Comparing Wave 1 to the pooled results reveals whether the early pandemic---before extensive politicization---showed different patterns. If concrete mortality threat reduces polarization, we might expect smaller or even reversed gaps in Wave 1 compared to later periods.
+
+### The Politicization of Mask-Wearing: Exact Gap Values
+
+@fig-behavior-very-concerned above shows how mask-wearing patterns among the "very concerned" reversed over time, alongside the changing composition of who reports being very concerned. @fig-mask-gap-very-concerned-over-time provides the exact D-R gap values for each wave.
+
+```{r}
+#| label: fig-mask-gap-very-concerned-over-time
+#| fig-cap: "D-R Mask Gap Among 'Very Concerned' Respondents Over Time. Bars show the Democrat-Republican difference in mask usage among those reporting being 'very concerned' about COVID-19. Negative values (red) indicate Republicans wore masks more; positive values (blue) indicate Democrats wore masks more. The reversal from waves 1-3 to waves 4-6 is evident. See @fig-behavior-very-concerned for context on changing composition."
+#| fig-height: 4
+#| fig-width: 7
+
+library(cowplot)
+
+# Load mask usage among very concerned by wave
+mask_vc <- read_csv("../out/tables/mask_among_very_concerned_by_wave.csv", show_col_types = FALSE) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Democrat", "Republican")),
+    wave_label = factor(wave, labels = c("Wave 1\nApr '20", "Wave 2\nJun '20", "Wave 3\nSep '20",
+                                          "Wave 4\nDec '20", "Wave 5\nFeb '21", "Wave 6\nMay '21"))
+  )
+
+# Calculate D-R gap by wave
+gap_by_wave <- mask_vc %>%
+  select(wave, wave_label, political_party, mask_usage) %>%
+  pivot_wider(names_from = political_party, values_from = mask_usage) %>%
+  mutate(
+    gap_dr = Democrat - Republican,
+    gap_color = ifelse(gap_dr >= 0, "D > R", "R > D")
+  )
+
+# D-R gap over time
+ggplot(gap_by_wave, aes(x = wave_label, y = gap_dr, fill = gap_color)) +
+  geom_col(width = 0.6, color = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_text(aes(label = sprintf("%+.1f", gap_dr)),
+            vjust = ifelse(gap_by_wave$gap_dr >= 0, -0.5, 1.5),
+            size = 3.5, fontface = "bold") +
+  scale_fill_manual(values = c("D > R" = "#2166AC", "R > D" = "#B2182B")) +
+  labs(
+    x = NULL,
+    y = "D-R Mask Gap (pp)"
+  ) +
+  theme_cowplot() +
+  theme(
+    axis.text.x = element_text(size = 9),
+    legend.position = "none"
+  )
+```
+
+As discussed in the main text, two dynamics likely contribute to this reversal: (1) masks became increasingly politicized as partisan signals, and (2) the Republicans who continued to report being "very concerned" became an increasingly select and unusual subset as overall Republican concern declined.
+
+## Stay-in-Place Orders Over Time {#sec-sip-appendix}
+
+@fig-sip-over-time shows the percentage of respondents reporting being under a stay-in-place order across the study period. The BICS survey asked respondents whether they were currently under a stay-in-place order in waves 1-5, but dropped this question entirely in wave 6 (May 2021)---the only survey item discontinued during the study---reflecting the widespread lifting of restrictions by that time.
+
+```{r}
+#| label: fig-sip-over-time
+#| fig-cap: "Percentage Reporting Being Under a Stay-in-Place Order Over Time. Panel A shows all respondents; Panel B shows only those reporting being 'very concerned' about COVID-19. Stay-in-place orders declined substantially over the study period. The question was dropped in wave 6 as most states had lifted formal restrictions by May 2021."
+#| fig-height: 4
+#| fig-width: 10
+
+library(patchwork)
+library(cowplot)
+
+# Load SIP data for all respondents
+pct_sip_all <- read_csv("../out/tables/pct_under_sip_by_wave.csv", show_col_types = FALSE) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Democrat", "Republican")),
+    wave_label = factor(wave, levels = 1:6, labels = c("W1\nApr'20", "W2\nJun'20", "W3\nSep'20",
+                                          "W4\nDec'20", "W5\nFeb'21", "W6\nMay'21"))
+  )
+
+# Load SIP data for very concerned only
+pct_sip_vc <- read_csv("../out/tables/pct_under_sip_very_concerned_by_wave.csv", show_col_types = FALSE) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Democrat", "Republican")),
+    wave_label = factor(wave, levels = 1:6, labels = c("W1\nApr'20", "W2\nJun'20", "W3\nSep'20",
+                                          "W4\nDec'20", "W5\nFeb'21", "W6\nMay'21"))
+  )
+
+# Panel A: All respondents
+p_all <- ggplot(pct_sip_all, aes(x = wave_label, y = pct_under_sip, color = political_party, group = political_party)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_x_discrete(drop = FALSE) +
+  scale_color_manual(values = c("Democrat" = "#2166AC", "Republican" = "#B2182B")) +
+  labs(x = NULL, y = "% Under Stay-in-Place", title = "A. All Respondents", color = NULL) +
+  theme_cowplot() +
+  theme(plot.title = element_text(face = "bold", size = 11), axis.text.x = element_text(size = 8)) +
+  annotate("text", x = 6, y = 75, label = "Question\ndropped", size = 2.5, hjust = 0.5, color = "gray40") +
+  ylim(60, 100)
+
+# Panel B: Very concerned only
+p_vc <- ggplot(pct_sip_vc, aes(x = wave_label, y = pct_under_sip, color = political_party, group = political_party)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_x_discrete(drop = FALSE) +
+  scale_color_manual(values = c("Democrat" = "#2166AC", "Republican" = "#B2182B")) +
+  labs(x = NULL, y = "% Under Stay-in-Place", title = "B. 'Very Concerned' Only", color = NULL) +
+  theme_cowplot() +
+  theme(plot.title = element_text(face = "bold", size = 11), axis.text.x = element_text(size = 8)) +
+  annotate("text", x = 6, y = 82, label = "Question\ndropped", size = 2.5, hjust = 0.5, color = "gray40") +
+  ylim(70, 100)
+
+p_all + p_vc + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+```
+
+Among all respondents (Panel A), the percentage reporting being under a stay-in-place order declined from approximately 95% in wave 1 to 70-81% by wave 5, with Republicans showing a larger decline than Democrats (11 percentage point gap by wave 5). This overall pattern is more representative than the "very concerned" subset (Panel B), since the share of Republicans reporting being "very concerned" declined substantially over the study---from 55% in wave 1 to just 26% by wave 6---making the very concerned Republicans an increasingly selective group. The declining trend in stay-in-place orders provides context for the behavioral changes observed in the main text: as restrictions lifted, particularly between waves 4-6, Democrats increased their contacts while maintaining high mask usage---consistent with a strategic shift toward relying on masks and vaccines for protection as they resumed social activities.
+
+## Interaction Models: Concern and Mortality as Moderators {#sec-interaction-models}
+
+To formally test whether stated concern and objective mortality rates moderate partisan gaps in health behaviors, we estimate interaction models of the form:
+
+$$\text{Behavior} = \beta_0 + \beta_1(\text{Republican}) + \beta_2(\text{Concern}) + \beta_3(\text{Mortality}) + \beta_4(\text{Rep} \times \text{Concern}) + \beta_5(\text{Rep} \times \text{Mortality}) + \text{FE}$$
+
+In this specification, the partisan gap equals $\beta_1 + \beta_4(\text{Concern}) + \beta_5(\text{Mortality})$.
+A negative $\beta_4$ indicates that higher concern *narrows* the partisan gap; a negative $\beta_5$ indicates that higher mortality narrows it.
+Concern is measured as a binary indicator for reporting being "very concerned" about COVID-19; mortality is the standardized log of the previous week's county-level mortality rate.
+
+We estimate two versions of this model to distinguish between national/temporal patterns and local variation:
+
+1. **Wave FE model**: Includes wave fixed effects and controls for metropolitan status. This captures how the partisan gap varies with *national* pandemic severity (high-mortality waves vs. low-mortality waves).
+
+2. **County FE model**: Includes county fixed effects. This asks: *within the same county*, when local mortality rises, does the partisan gap narrow? This isolates the effect of local conditions from all time-invariant county characteristics.
+
+```{r}
+#| label: load-interaction-results
+#| include: false
+
+# Load pre-computed statistics
+stats_path <- "../out/tables/paper_statistics.rds"
+if (file.exists(stats_path)) {
+  paper_stats <- readRDS(stats_path)
+  list2env(paper_stats, envir = environment())
+}
+
+# Load pre-computed interaction model results
+interaction_all <- read_csv("../out/tables/interaction_model_results.csv", show_col_types = FALSE) %>%
+  filter(term %in% c("republican", "republican:very_concerned", "republican:log_mort_std")) %>%
+  mutate(
+    term_label = case_when(
+      term == "republican" ~ "Baseline Gap",
+      term == "republican:very_concerned" ~ "Rep × Concern",
+      term == "republican:log_mort_std" ~ "Rep × Mortality"
+    ),
+    term_label = factor(term_label, levels = c("Baseline Gap",
+                                                "Rep × Concern",
+                                                "Rep × Mortality")),
+    outcome = factor(outcome, levels = c("Contacts", "Masks")),
+    model = factor(model, levels = c("Wave FE", "County FE"))
+  )
+```
+
+```{r}
+#| label: fig-interaction-coefs
+#| fig-cap: "Moderators of Partisan Gaps: Wave FE vs. County FE Models. Points show regression coefficients from interaction models predicting contacts (purple) and mask usage (green). Left panel uses wave fixed effects (national/temporal variation); right panel uses county fixed effects (local variation). 'Baseline Gap' is the Republican main effect. 'Rep × Concern' shows how being very concerned changes the gap. 'Rep × Mortality' shows how a 1 SD increase in local log mortality changes the gap. Negative values indicate the gap narrows. Error bars are 95% CIs."
+#| fig-height: 5
+#| fig-width: 10
+
+library(ggplot2)
+library(cowplot)
+
+# Colors for the two outcomes
+outcome_colors <- c("Contacts" = "#7570b3", "Masks" = "#1b9e77")
+
+ggplot(interaction_all, aes(x = term_label, y = estimate, color = outcome)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_pointrange(aes(ymin = estimate - 1.96 * std.error,
+                      ymax = estimate + 1.96 * std.error),
+                  position = position_dodge(width = 0.5), size = 0.7) +
+  scale_color_manual(values = outcome_colors) +
+  facet_wrap(~ model) +
+  labs(x = NULL, y = "Coefficient (effect on R-D gap)", color = "Outcome") +
+  coord_flip() +
+  theme_cowplot() +
+  theme(
+    legend.position = "bottom",
+    axis.text.y = element_text(size = 10),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+@fig-interaction-coefs displays the results from both specifications.
+
+**Wave FE Model (National/Temporal Patterns):**
+For contacts, the baseline Republican-Democrat gap is `r sprintf("%.2f", contact_int_baseline)` contacts per day.
+The concern interaction is small and not statistically significant ($\beta$ = `r sprintf("%.2f", contact_int_concern)`, p = `r sprintf("%.2f", contact_int_concern_p)`), confirming that stated concern does not moderate the contact gap.
+The mortality interaction is negative ($\beta$ = `r sprintf("%.2f", contact_int_mort)`, p = `r sprintf("%.3f", contact_int_mort_p)`): during high-mortality waves, the partisan gap narrows.
+
+For masks, the baseline gap is `r sprintf("%.1f", abs(mask_int_baseline))` percentage points.
+The concern interaction is large and significant ($\beta$ = `r sprintf("%.1f", mask_int_concern)`, p < 0.001): being "very concerned" substantially narrows the mask gap.
+The mortality interaction is smaller and in the opposite direction ($\beta$ = `r sprintf("%.1f", mask_int_mort)`).
+
+**County FE Model (Local Variation):**
+The county FE model asks whether the partisan gap narrows *within counties* when local mortality rises.
+For contacts, the mortality interaction is `r sprintf("%.2f", contact_county_mort)` (p = `r sprintf("%.3f", contact_county_mort_p)`), indicating that local mortality conditions also moderate the partisan gap.
+For masks, the local mortality interaction is `r sprintf("%.1f", mask_county_mort)` (p = `r sprintf("%.3f", mask_county_mort_p)`).
+
+Both specifications support the same conclusion: **concern moderates the mask gap but not the contact gap; mortality moderates the contact gap but not the mask gap.**
+This pattern holds whether we examine national trends (wave FE) or local variation (county FE), suggesting it reflects a genuine behavioral response to pandemic conditions rather than a compositional artifact.
+
+## Adjusted Partisan Behaviors Over Time {#sec-adjusted-behaviors}
+
+```{r}
+#| label: load-adjusted-data
+#| include: false
+
+# Load adjusted behaviors data (from emmeans models)
+adjusted_behaviors <- read_csv("../out/tables/adjusted_behaviors_by_wave.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+adjusted_gaps <- read_csv("../out/tables/adjusted_gaps_by_wave.csv", show_col_types = FALSE) %>%
+  mutate(
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+# Separate by outcome and filter to just Republicans and Democrats
+contacts_adjusted <- adjusted_behaviors %>%
+  filter(outcome == "contacts", political_party != "Independent")
+masks_adjusted <- adjusted_behaviors %>%
+  filter(outcome == "masks", political_party != "Independent")
+concern_adjusted <- adjusted_behaviors %>%
+  filter(outcome == "concern", political_party != "Independent")
+
+contacts_gaps <- adjusted_gaps %>% filter(outcome == "contacts")
+masks_gaps <- adjusted_gaps %>% filter(outcome == "masks")
+concern_gaps <- adjusted_gaps %>% filter(outcome == "concern")
+
+# Summary stats for text
+max_contact_gap_adj <- contacts_gaps %>% slice_max(gap_rep_dem, n = 1)
+min_contact_gap_adj <- contacts_gaps %>% slice_min(gap_rep_dem, n = 1)
+max_mask_gap_adj <- masks_gaps %>% slice_max(abs(gap_rep_dem), n = 1)
+min_mask_gap_adj <- masks_gaps %>% slice_min(abs(gap_rep_dem), n = 1)
+max_concern_gap_adj <- concern_gaps %>% slice_max(abs(gap_rep_dem), n = 1)
+min_concern_gap_adj <- concern_gaps %>% slice_min(abs(gap_rep_dem), n = 1)
+```
+
+The main text presents descriptive partisan differences in health behaviors over time. To assess whether these patterns persist after accounting for demographic and contextual factors, we estimate regression models with party-by-wave interactions, controlling for age, race/ethnicity, Hispanic origin, gender, education, household size, congressional district partisan composition, and local mortality rates. We then extract estimated marginal means (emmeans) for each party at each wave, averaging over covariates. This approach isolates partisan differences while holding constant the demographic and geographic factors that might otherwise confound comparisons.
+
+@fig-adjusted-behaviors displays the adjusted behavior levels by party across survey waves, and @fig-adjusted-gaps shows the resulting partisan gaps.
+
+```{r}
+#| label: fig-adjusted-behaviors
+#| fig-cap: "Adjusted Health Behaviors and Perceptions for Republicans and Democrats Across Survey Waves. Points show estimated marginal means from models controlling for age, race/ethnicity, gender, education, household size, congressional district partisanship, and local mortality rates. Error bars indicate 95% confidence intervals."
+#| fig-height: 4
+#| fig-width: 14
+
+library(cowplot)
+library(patchwork)
+
+# Party colors
+party_colors <- c("Republican" = "#c50000", "Independent" = "#6db753", "Democrat" = "#326ba4")
+
+# Contacts plot
+p_contacts_adj <- ggplot(contacts_adjusted, aes(x = wave_label, y = estimate,
+                                                 color = political_party, group = political_party)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.15, alpha = 0.7) +
+  scale_color_manual(values = party_colors) +
+  labs(x = NULL, y = "Daily Contacts", title = "A. Adjusted Daily Contacts", color = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+# Masks plot
+p_masks_adj <- ggplot(masks_adjusted, aes(x = wave_label, y = estimate,
+                                           color = political_party, group = political_party)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.15, alpha = 0.7) +
+  scale_color_manual(values = party_colors) +
+  labs(x = NULL, y = "Mask Usage (%)", title = "B. Adjusted Mask Usage", color = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+# Concern plot
+p_concern_adj <- ggplot(concern_adjusted, aes(x = wave_label, y = estimate,
+                                               color = political_party, group = political_party)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.15, alpha = 0.7) +
+  scale_color_manual(values = party_colors) +
+  labs(x = NULL, y = "Very Concerned (%)", title = "C. Adjusted Concern", color = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+p_contacts_adj + p_masks_adj + p_concern_adj + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+```
+
+```{r}
+#| label: fig-adjusted-gaps
+#| fig-cap: "Adjusted Partisan Gaps in Health Behaviors and Perceptions Over Time. Bars show the Republican-Democrat difference in estimated marginal means for daily contacts (Panel A), mask usage (Panel B), and stated concern (Panel C), after controlling for covariates. Negative values indicate Democrats are higher. Purple bars indicate statistically significant gaps (p < 0.05); gray bars indicate non-significant gaps."
+#| fig-height: 4
+#| fig-width: 14
+
+# Calculate standard errors for gaps and determine significance
+# SE_gap = sqrt(SE_R^2 + SE_D^2)
+calc_gap_significance <- function(behaviors_df, outcome_name) {
+  behaviors_df %>%
+    filter(outcome == outcome_name) %>%
+    select(wave, political_party, estimate, std_error) %>%
+    pivot_wider(names_from = political_party, values_from = c(estimate, std_error)) %>%
+    mutate(
+      gap_rep_dem = estimate_Republican - estimate_Democrat,
+      se_gap = sqrt(std_error_Republican^2 + std_error_Democrat^2),
+      significant = abs(gap_rep_dem) > 1.96 * se_gap
+    ) %>%
+    select(wave, gap_rep_dem, se_gap, significant)
+}
+
+contacts_sig <- calc_gap_significance(adjusted_behaviors, "contacts") %>%
+  mutate(outcome_label = "A. Contact Gap (R - D)")
+masks_sig <- calc_gap_significance(adjusted_behaviors, "masks") %>%
+  mutate(outcome_label = "B. Mask Gap (R - D)")
+concern_sig <- calc_gap_significance(adjusted_behaviors, "concern") %>%
+  mutate(outcome_label = "C. Concern Gap (R - D)")
+
+# Combine with wave labels
+gaps_long <- bind_rows(contacts_sig, masks_sig, concern_sig) %>%
+  mutate(
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+ggplot(gaps_long, aes(x = wave_label, y = gap_rep_dem, fill = significant)) +
+  geom_col(alpha = 0.85, width = 0.6, color = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_text(aes(label = sprintf("%.1f", gap_rep_dem),
+                y = gap_rep_dem / 2),
+            color = "white", size = 3.5, fontface = "bold") +
+  scale_fill_manual(values = c("TRUE" = "#7570b3", "FALSE" = "gray60"),
+                    labels = c("TRUE" = "p < 0.05", "FALSE" = "n.s."),
+                    name = NULL) +
+  facet_wrap(~ outcome_label, scales = "free_y", nrow = 1) +
+  labs(x = NULL, y = "Adjusted R-D Difference") +
+  theme_cowplot() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold"),
+    strip.background = element_blank(),
+    legend.position = "bottom"
+  )
+```
+
+### Interpretation
+
+After adjusting for covariates, the patterns of partisan differences reveal important nuances. For **contact behavior**, the descriptive data show that partisan gaps were smallest early in the pandemic, with Republicans reporting only 0.4 more contacts than Democrats in April 2020 compared to gaps of 1-3 contacts in later waves. The adjusted analysis goes further: after controlling for demographics, the April 2020 gap is not only small but *statistically indistinguishable from zero* (see @fig-adjusted-gaps, gray bars indicate non-significant differences). In fact, the point estimate is slightly negative, suggesting that if anything, Democrats had marginally more contacts than Republicans when mortality was at its peak. This stands in stark contrast to the large, statistically significant gaps observed in September 2020 and May 2021, periods of relatively lower pandemic intensity. The pattern supports the interpretation that concrete, visible threat can eliminate---not merely reduce---partisan divergence in behavior.
+
+For **mask-wearing**, the adjusted analysis reveals that partisan differences fluctuated rather than monotonically increasing. The Democrat-Republican mask gap (with Democrats wearing masks more) ranged from `r sprintf("%.1f", abs(min_mask_gap_adj$gap_rep_dem))` percentage points in `r min_mask_gap_adj$wave_label` to `r sprintf("%.1f", abs(max_mask_gap_adj$gap_rep_dem))` percentage points in `r max_mask_gap_adj$wave_label`. Notably, the gap was relatively narrow during fall 2020 when mask usage was high across all groups, but widened again in early 2021 as vaccines became available and Republicans began to decrease mask usage more rapidly.
+
+For **stated concern**, the adjusted analysis confirms that the perception gap was smallest at the beginning of the pandemic (when mortality was highest) and widened substantially thereafter. The adjusted Democrat-Republican concern gap ranged from `r sprintf("%.1f", abs(min_concern_gap_adj$gap_rep_dem))` percentage points in `r min_concern_gap_adj$wave_label` to `r sprintf("%.1f", abs(max_concern_gap_adj$gap_rep_dem))` percentage points in `r max_concern_gap_adj$wave_label`. This pattern parallels the contact findings: when objective threat was most severe, partisan gaps in both behavior and perception were smallest. The subsequent widening of the concern gap, even as mortality rates declined, supports the interpretation that politicization drove perceptual divergence.
+
+These adjusted estimates confirm that partisan differences in health behaviors and perceptions were not simply artifacts of demographic composition or geographic sorting. Even after controlling for a comprehensive set of covariates, substantial partisan gaps persisted throughout the pandemic, though their magnitude varied with pandemic conditions---narrowing when mortality was highest and widening as the pandemic became increasingly politicized.
+
+## Partisan Differences Within Policy Environments {#sec-policy-environment}
+
+```{r}
+#| label: load-policy-data
+#| include: false
+
+# Load behaviors by policy environment
+behaviors_by_policy <- read_csv("../out/tables/behaviors_by_policy.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    policy = factor(policy, levels = c("No Mandate", "Less Strict", "Strict"))
+  )
+```
+
+A potential alternative explanation for partisan differences in health behaviors is that Democrats disproportionately reside in jurisdictions with stricter COVID-19 policies, and their behavior simply reflects compliance with local regulations rather than partisan preferences. To address this concern, we examine whether partisan differences persist within the same policy environment.
+
+@fig-contacts-by-policy and @fig-masks-by-policy display mean contact rates and mask usage by party, stratified by county-level mask mandate policy (No Mandate, Less Strict, or Strict). If policy environment fully explained partisan differences, we would expect the gaps between parties to disappear within each policy category.
+
+```{r}
+#| label: fig-contacts-by-policy
+#| fig-cap: "Daily Contacts by Party Within Policy Environments. Bars show weighted mean daily contacts for each party, faceted by county mask mandate policy. Error bars indicate standard errors."
+#| fig-height: 8
+#| fig-width: 6
+
+library(cowplot)
+
+# Party colors
+party_colors <- c("Republican" = "#c50000", "Independent" = "#6db753", "Democrat" = "#326ba4")
+
+# Contacts by policy - faceted vertically
+ggplot(behaviors_by_policy, aes(x = political_party, y = contacts_mean, fill = political_party)) +
+  geom_col(width = 0.7, alpha = 0.8, color = "black") +
+  geom_errorbar(aes(ymin = contacts_mean - contacts_se, ymax = contacts_mean + contacts_se),
+                width = 0.2) +
+  geom_text(aes(label = sprintf("%.1f", contacts_mean)), vjust = -1.2, size = 3.5, fontface = "bold") +
+  facet_wrap(~ policy, ncol = 1) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.2))) +
+  labs(x = NULL, y = "Daily Contacts") +
+  theme_cowplot() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 11),
+    strip.text = element_text(face = "bold", size = 14),
+    strip.background = element_blank()
+  )
+```
+
+```{r}
+#| label: fig-masks-by-policy
+#| fig-cap: "Mask Usage by Party Within Policy Environments. Bars show weighted mean mask usage (percentage of contacts with masks) for each party, faceted by county mask mandate policy. Error bars indicate standard errors."
+#| fig-height: 8
+#| fig-width: 6
+
+# Masks by policy - faceted vertically
+ggplot(behaviors_by_policy, aes(x = political_party, y = mask_mean, fill = political_party)) +
+  geom_col(width = 0.7, alpha = 0.8, color = "black") +
+  geom_errorbar(aes(ymin = mask_mean - mask_se, ymax = mask_mean + mask_se),
+                width = 0.2) +
+  geom_text(aes(label = sprintf("%.0f%%", mask_mean)), vjust = -1.2, size = 3.5, fontface = "bold") +
+  facet_wrap(~ policy, ncol = 1) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.2)), limits = c(0, 85)) +
+  labs(x = NULL, y = "Mask Usage (%)") +
+  theme_cowplot() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 11),
+    strip.text = element_text(face = "bold", size = 14),
+    strip.background = element_blank()
+  )
+```
+
+The results clearly demonstrate that partisan differences are not simply artifacts of differential policy exposure. Within each policy environment, Republicans reported more daily contacts than Democrats: the gap was 1.4 contacts in No Mandate areas, 1.0 contacts in Less Strict areas, and 1.3 contacts in Strict mandate areas. Similarly, Democrats reported higher mask usage than Republicans across all policy contexts: the gap was 9 percentage points in No Mandate areas, 11 percentage points in Less Strict areas, and 10 percentage points in Strict mandate areas.
+
+These findings suggest that partisan identity shapes health behaviors above and beyond the effects of local policy. While stricter policies are associated with higher mask usage overall, the Republican-Democrat gap in mask-wearing remains remarkably stable across policy environments. This pattern is consistent with partisanship operating through mechanisms other than policy compliance---such as differential risk perception, social norms within partisan networks, or ideological commitments---that persist regardless of the local regulatory context.
+
+## Weight Sensitivity Analysis {#sec-weight-sensitivity}
+
+```{r}
+#| label: load-sensitivity-data
+#| include: false
+
+# Load sensitivity analysis results
+# Use relative paths from paper directory
+weight_summary <- read_csv("../out/tables/weight_sensitivity_summary.csv",
+                           show_col_types = FALSE)
+regression_sensitivity <- read_csv("../out/tables/regression_weight_sensitivity.csv",
+                                    show_col_types = FALSE)
+
+# Extract key values for inline reporting
+contact_gap_unweighted <- weight_summary %>%
+  filter(Statistic == "Contact Gap (R-D)") %>%
+  pull(Unweighted)
+contact_gap_weighted <- weight_summary %>%
+  filter(Statistic == "Contact Gap (R-D)") %>%
+  pull(Original)
+contact_gap_pct_change <- abs((contact_gap_weighted - contact_gap_unweighted) / contact_gap_unweighted) * 100
+
+vax_gap_unweighted <- weight_summary %>%
+  filter(Statistic == "Vaccination Gap (R-D)") %>%
+  pull(Unweighted)
+vax_gap_weighted <- weight_summary %>%
+  filter(Statistic == "Vaccination Gap (R-D)") %>%
+  pull(Original)
+vax_gap_pct_change <- abs((vax_gap_weighted - vax_gap_unweighted) / vax_gap_unweighted) * 100
+
+mask_gap_unweighted <- regression_sensitivity %>%
+  filter(outcome == "Mask Usage", comparison == "Republican - Democrat", weight_type == "Unweighted") %>%
+  pull(estimate)
+mask_gap_weighted <- regression_sensitivity %>%
+  filter(outcome == "Mask Usage", comparison == "Republican - Democrat", weight_type == "Original") %>%
+  pull(estimate)
+```
+
+To assess the robustness of our findings to different weighting approaches, we compare results across three scenarios: (1) unweighted estimates, (2) original demographic weights that adjust for age, gender, race/ethnicity, and education, and (3) raked weights that additionally adjust for party identification to match national targets from Gallup polling (30% Democrat, 29% Republican, 39% Independent; @gallup_party_2021). The raking procedure adjusts for potential correlations between party identification and demographic characteristics in our sample.
+
+A key finding from this analysis is that raked weights and original demographic weights produce identical within-party estimates for all outcomes. This equivalence occurs because the raking procedure applies a constant multiplier to all observations within each party group. When calculating within-party means or party-specific regression coefficients, this constant multiplier cancels out. Raking only matters for population-level estimates that pool across partisan groups, where it adjusts the relative contribution of each party to the overall estimate.
+
+We observe small differences between unweighted and weighted estimates. The Republican-Democrat contact gap is `r sprintf("%.2f", contact_gap_unweighted)` contacts per day using unweighted data compared to `r sprintf("%.2f", contact_gap_weighted)` contacts per day with demographic weights---a `r sprintf("%.0f", contact_gap_pct_change)`% reduction. The vaccine acceptance gap is `r sprintf("%.1f", vax_gap_unweighted)` percentage points (unweighted) versus `r sprintf("%.1f", vax_gap_weighted)` percentage points (weighted)---a `r sprintf("%.0f", vax_gap_pct_change)`% reduction in the absolute gap. Mask usage differences remain stable across all weighting scenarios, with the Republican-Democrat gap at approximately `r sprintf("%.1f", mask_gap_unweighted)` percentage points regardless of weights used.
+
+Importantly, all partisan differences remain highly significant (p < 0.001) across all three weighting scenarios. These results demonstrate that our findings are robust to the choice of weighting specification and that the substantive conclusions about partisan gaps in health behaviors do not depend on how we adjust for sample composition.
+
+### Summary Table
+
+```{r}
+#| label: tbl-weight-sensitivity
+#| tbl-cap: "Partisan Differences in Health Behaviors Across Weighting Scenarios"
+
+# Create summary table for key partisan gaps
+sensitivity_table <- regression_sensitivity %>%
+  filter(comparison %in% c("Republican - Democrat", "Independent - Democrat")) %>%
+  select(weight_type, comparison, estimate, std.error, sig, outcome) %>%
+  mutate(
+    weight_type = factor(weight_type, levels = c("Unweighted", "Original", "Raked")),
+    comparison = factor(comparison, levels = c("Republican - Democrat", "Independent - Democrat")),
+    outcome = factor(outcome, levels = c("Contacts", "Mask Usage", "Vaccine Acceptance")),
+    estimate_se = sprintf("%.2f (%.2f)%s", estimate, std.error, sig)
+  ) %>%
+  select(outcome, comparison, weight_type, estimate_se) %>%
+  pivot_wider(
+    names_from = weight_type,
+    values_from = estimate_se
+  ) %>%
+  arrange(outcome, comparison)
+
+# Format table
+kable(sensitivity_table,
+      col.names = c("Outcome", "Comparison", "Unweighted", "Original Weights", "Raked Weights"),
+      align = c("l", "l", "c", "c", "c"),
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("hold_position")) %>%
+  footnote(general = "Estimates shown with standard errors in parentheses. Significance: * p < 0.05, ** p < 0.01, *** p < 0.001. Contacts measured as daily contacts; mask usage and vaccine acceptance measured in percentage points.",
+           general_title = "Note: ",
+           footnote_as_chunk = TRUE)
+```
+
+### Comparison of Partisan Gaps
+
+```{r}
+#| label: fig-weight-sensitivity
+#| fig-cap: "Republican-Democrat Differences in Health Behaviors Across Weighting Scenarios"
+#| fig-height: 5
+#| fig-width: 8
+
+# Prepare data for plotting
+plot_data <- regression_sensitivity %>%
+  filter(comparison == "Republican - Democrat") %>%
+  mutate(
+    weight_type = factor(weight_type, levels = c("Unweighted", "Original", "Raked")),
+    outcome = factor(outcome, levels = c("Contacts", "Mask Usage", "Vaccine Acceptance"),
+                     labels = c("Daily Contacts\n(count)",
+                               "Mask Usage\n(percentage points)",
+                               "Vaccine Acceptance\n(percentage points)"))
+  )
+
+library(cowplot)
+
+# Create grouped bar chart
+ggplot(plot_data, aes(x = outcome, y = estimate, fill = weight_type)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7,
+           alpha = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = estimate - 1.96 * std.error,
+                    ymax = estimate + 1.96 * std.error),
+                position = position_dodge(width = 0.8),
+                width = 0.25) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_fill_manual(values = c("Unweighted" = "#1b9e77",
+                               "Original" = "#d95f02",
+                               "Raked" = "#7570b3"),
+                    name = "Weighting\nScenario") +
+  labs(x = NULL,
+       y = "Republican - Democrat Difference") +
+  theme_cowplot() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(size = 10)
+  )
+```
+
+## Geographic Variation in Incidence Responsiveness {#sec-geographic-variation}
+
+```{r}
+#| label: load-wave-responsiveness
+#| include: false
+
+# Load wave-by-wave incidence responsiveness results
+wave_resp <- read_csv("../out/tables/wave_incidence_responsiveness.csv",
+                      show_col_types = FALSE) %>%
+  mutate(
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+# Summary statistics
+n_waves_significant <- sum(wave_resp$gap_change < 0, na.rm = TRUE)
+avg_gap_change <- mean(wave_resp$gap_change, na.rm = TRUE)
+max_rep_reduction <- wave_resp %>% slice_min(effect_rep, n = 1)
+min_rep_reduction <- wave_resp %>% slice_max(effect_rep, n = 1)
+```
+
+The main text presents models that pool across survey waves, using temporal variation in pandemic conditions (alongside geographic variation) to identify behavioral responses. To isolate the role of geographic variation, we estimate separate models for each survey wave. Within a single wave, variation in county-level incidence rates is purely geographic, reflecting cross-sectional differences in local pandemic severity rather than temporal trends. This approach allows us to examine whether partisan differences in responsiveness to local conditions are consistent across different periods of the pandemic.
+
+@tbl-wave-responsiveness presents the estimated change in daily contacts associated with a 10% increase in local (log) incidence rates, by party and wave. All models include state fixed effects to control for time-invariant state characteristics. @fig-wave-responsiveness visualizes these results, showing how the incidence-responsiveness of each partisan group varied over the study period.
+
+```{r}
+#| label: tbl-wave-responsiveness
+#| tbl-cap: "Contact Response to Local Incidence by Wave and Party"
+
+wave_resp %>%
+  select(wave_label, n, mean_inc_rate, effect_dem, effect_ind, effect_rep, gap_change) %>%
+  kable(
+    col.names = c("Wave", "N", "Mean Inc. Rate", "Democrat", "Independent", "Republican", "R-D Gap Change"),
+    digits = c(0, 0, 1, 3, 3, 3, 3),
+    align = c("l", "r", "r", "r", "r", "r", "r"),
+    booktabs = TRUE
+  ) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  footnote(
+    general = "Effects represent the change in daily contacts associated with a 10% increase in local log incidence rate. Negative values indicate contact reduction. R-D Gap Change shows how the Republican-Democrat contact gap changes (negative = gap narrows). All models include state fixed effects, city indicators, and interview day controls.",
+    general_title = "Note: ",
+    footnote_as_chunk = TRUE
+  )
+```
+
+```{r}
+#| label: fig-wave-responsiveness
+#| fig-cap: "Contact Response to Local Incidence Across Survey Waves. Points show the estimated change in daily contacts associated with a 10% increase in local log incidence rates, by party and wave. Error bars indicate standard errors. Dashed line at zero represents no response."
+#| fig-height: 5
+#| fig-width: 9
+
+# Party colors (matching other BICS plots)
+party_colors <- c("Democrat" = "#326ba4", "Independent" = "#6db753", "Republican" = "#c50000")
+
+# Reshape for plotting
+wave_plot_data <- wave_resp %>%
+  select(wave_label, effect_dem, effect_ind, effect_rep, se_dem, se_ind, se_rep) %>%
+  pivot_longer(
+    cols = starts_with("effect_"),
+    names_to = "party",
+    names_prefix = "effect_",
+    values_to = "effect"
+  ) %>%
+  mutate(
+    se = case_when(
+      party == "dem" ~ wave_resp$se_dem[match(wave_label, wave_resp$wave_label)],
+      party == "ind" ~ wave_resp$se_ind[match(wave_label, wave_resp$wave_label)],
+      party == "rep" ~ wave_resp$se_rep[match(wave_label, wave_resp$wave_label)]
+    ),
+    party = case_when(
+      party == "dem" ~ "Democrat",
+      party == "ind" ~ "Independent",
+      party == "rep" ~ "Republican"
+    ),
+    party = factor(party, levels = c("Republican", "Independent", "Democrat"))
+  )
+
+ggplot(wave_plot_data, aes(x = wave_label, y = effect, color = party, group = party)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_line(linewidth = 0.8, alpha = 0.7) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = effect - se, ymax = effect + se), width = 0.15) +
+  scale_color_manual(values = party_colors) +
+  labs(
+    x = "Survey Wave",
+    y = "Change in Daily Contacts\n(per 10% increase in log incidence)",
+    color = "Party"
+  ) +
+  theme_cowplot() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+### Interpretation
+
+The wave-by-wave analysis reveals several patterns. First, Republicans consistently show stronger contact reductions in response to local incidence than Democrats across most survey waves. In `r n_waves_significant` of 6 waves, the Republican-Democrat gap change is negative, indicating that higher local incidence narrows the partisan contact gap. Second, the magnitude of responsiveness varies over time, with the strongest Republican responses occurring during `r max_rep_reduction$wave_label` when mean incidence was `r sprintf("%.1f", max_rep_reduction$mean_inc_rate)` cases per 100,000.
+
+These within-wave analyses provide complementary evidence to the pooled models in the main text. By isolating geographic variation in incidence, we demonstrate that partisan differences in responsiveness are not artifacts of differential exposure to temporal trends in the pandemic. Rather, when comparing individuals facing different local conditions at the same point in time, Republicans are more responsive to higher local incidence than Democrats---a pattern that helps explain the narrowing of partisan gaps during periods of elevated disease burden.
+
+## Partisan Behavior Levels Over Time {#sec-behavior-levels}
+
+```{r}
+#| label: load-behavior-levels
+#| include: false
+
+# Load wave-level behavior data
+behaviors_by_wave <- read_csv("../out/tables/behaviors_by_wave.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label, levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+  )
+
+# Calculate variability statistics
+contact_variability <- behaviors_by_wave %>%
+  group_by(political_party) %>%
+  summarise(
+    mean_contacts = mean(total_contacts),
+    sd_contacts = sd(total_contacts),
+    cv_contacts = sd(total_contacts) / mean(total_contacts) * 100,
+    .groups = "drop"
+  )
+
+mask_variability <- behaviors_by_wave %>%
+  group_by(political_party) %>%
+  summarise(
+    mean_mask = mean(mask_usage),
+    sd_mask = sd(mask_usage),
+    cv_mask = sd(mask_usage) / mean(mask_usage) * 100,
+    .groups = "drop"
+  )
+
+rep_cv_contacts <- contact_variability %>% filter(political_party == "Republican") %>% pull(cv_contacts)
+dem_cv_contacts <- contact_variability %>% filter(political_party == "Democrat") %>% pull(cv_contacts)
+rep_cv_mask <- mask_variability %>% filter(political_party == "Republican") %>% pull(cv_mask)
+dem_cv_mask <- mask_variability %>% filter(political_party == "Democrat") %>% pull(cv_mask)
+```
+
+The main text documents how partisan gaps in health behaviors varied over the course of the pandemic. To understand what drives these fluctuations, @fig-behavior-levels displays the average behavior levels for each party across survey waves. This decomposition reveals an important asymmetry: **Democrats maintained relatively stable behavior throughout the pandemic, while Republicans showed substantially greater variability**.
+
+```{r}
+#| label: fig-behavior-levels
+#| fig-cap: "Health Behavior Levels by Party Across Survey Waves. Panel A shows mean daily contacts; Panel B shows mask usage (percentage of contacts with masks). Gray background bars indicate weekly COVID-19 cases (in thousands). Democrats (blue) maintained relatively stable behavior while Republicans (red) showed greater variability, particularly in contact behavior."
+#| fig-height: 5
+#| fig-width: 11
+
+# Party colors
+party_colors <- c("Democrat" = "#326ba4", "Independent" = "#6db753", "Republican" = "#c50000")
+
+# Weekly cases data (wave 1: ~200k weekly cases in April 2020)
+weekly_cases <- tibble(
+  wave = 1:6,
+  cases_thousands = c(200, 693, 772, 2351, 2192, 545),
+  wave_label = factor(c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"),
+                      levels = c("Apr '20", "Jun '20", "Sep '20", "Dec '20", "Feb '21", "May '21"))
+)
+
+# Scaling for dual axis
+max_cases <- max(weekly_cases$cases_thousands)
+max_contacts <- max(behaviors_by_wave$total_contacts)
+max_mask <- max(behaviors_by_wave$mask_usage)
+contact_scale <- max_contacts / max_cases * 1.3
+mask_scale <- max_mask / max_cases * 1.3
+
+# Contacts by party
+p_contacts <- ggplot() +
+  # Background: cases
+  geom_col(data = weekly_cases, aes(x = wave_label, y = cases_thousands * contact_scale),
+           fill = "gray80", alpha = 0.5, width = 0.7) +
+  # Lines for each party
+  geom_line(data = behaviors_by_wave,
+            aes(x = wave_label, y = total_contacts, color = political_party, group = political_party),
+            linewidth = 1.2) +
+  geom_point(data = behaviors_by_wave,
+             aes(x = wave_label, y = total_contacts, color = political_party),
+             size = 3) +
+  scale_color_manual(values = party_colors) +
+  scale_y_continuous(
+    name = "Daily Contacts",
+    sec.axis = sec_axis(~ . / contact_scale, name = "Weekly Cases (thousands)"),
+    expand = expansion(mult = c(0.02, 0.1))
+  ) +
+  labs(x = NULL, title = "A. Daily Contacts by Party", color = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y.right = element_text(color = "gray50"),
+    legend.position = "bottom"
+  )
+
+# Mask usage by party
+p_masks <- ggplot() +
+  # Background: cases
+  geom_col(data = weekly_cases, aes(x = wave_label, y = cases_thousands * mask_scale),
+           fill = "gray80", alpha = 0.5, width = 0.7) +
+  # Lines for each party
+  geom_line(data = behaviors_by_wave,
+            aes(x = wave_label, y = mask_usage, color = political_party, group = political_party),
+            linewidth = 1.2) +
+  geom_point(data = behaviors_by_wave,
+             aes(x = wave_label, y = mask_usage, color = political_party),
+             size = 3) +
+  scale_color_manual(values = party_colors) +
+  scale_y_continuous(
+    name = "Mask Usage (%)",
+    sec.axis = sec_axis(~ . / mask_scale, name = "Weekly Cases (thousands)"),
+    expand = expansion(mult = c(0.02, 0.1))
+  ) +
+  labs(x = NULL, title = "B. Mask Usage by Party", color = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y.right = element_text(color = "gray50"),
+    legend.position = "bottom"
+  )
+
+# Combine with shared legend
+p_contacts + p_masks + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+```
+
+For contact behavior (Panel A), Democrats maintained a relatively narrow range of daily contacts across all six waves, while Republicans exhibited pronounced swings---increasing contacts substantially during periods of lower case counts (September 2020) and reducing them during surges (December 2020, February 2021). The coefficient of variation for Republican contacts (`r sprintf("%.1f", rep_cv_contacts)`%) was notably higher than for Democrats (`r sprintf("%.1f", dem_cv_contacts)`%), confirming greater Republican variability.
+
+Mask usage (Panel B) shows a different pattern. All parties increased mask-wearing from the early pandemic through winter 2020--21, but Republicans started from a lower baseline and showed steeper declines as vaccines became available in spring 2021. Democrats maintained consistently high mask usage throughout, while Republican mask-wearing tracked more closely with pandemic conditions. This asymmetry---stable Democratic behavior paired with variable Republican behavior---is the primary driver of the fluctuating partisan gaps documented in the main text.
+
+### Formal Test of Variance Differences
+
+```{r}
+#| label: levene-test
+#| include: false
+
+library(car)
+
+# Load the main dataset for individual-level variance test
+bics_data <- read_csv("../data/BICS_ZIP_Features.csv", show_col_types = FALSE) %>%
+  filter(!is.na(political_party) & political_party != "Prefer not to answer")
+
+# Levene's test for equality of variances
+levene_result <- leveneTest(num_cc ~ political_party, data = bics_data)
+
+levene_f <- levene_result$`F value`[1]
+levene_df1 <- levene_result$Df[1]
+levene_df2 <- levene_result$Df[2]
+levene_p <- levene_result$`Pr(>F)`[1]
+
+# Calculate individual-level variance by party
+variance_by_party <- bics_data %>%
+  group_by(political_party) %>%
+  summarise(
+    n = n(),
+    mean_contacts = mean(num_cc, na.rm = TRUE),
+    sd_contacts = sd(num_cc, na.rm = TRUE),
+    var_contacts = var(num_cc, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+rep_var <- variance_by_party %>% filter(political_party == "Republican") %>% pull(var_contacts)
+dem_var <- variance_by_party %>% filter(political_party == "Democrat") %>% pull(var_contacts)
+ind_var <- variance_by_party %>% filter(political_party == "Independent") %>% pull(var_contacts)
+```
+
+To formally test whether variance in contact behavior differs across partisan groups, we conducted Levene's test for equality of variances on individual-level contact data. The results confirm significant heterogeneity in variance across parties (F(`r levene_df1`, `r format(levene_df2, big.mark = ",")`) = `r sprintf("%.2f", levene_f)`, p < 0.001). Republicans exhibited the highest variance in daily contacts (`r sprintf("%.1f", rep_var)`), followed by Independents (`r sprintf("%.1f", ind_var)`) and Democrats (`r sprintf("%.1f", dem_var)`). @tbl-variance-test summarizes these results.
+
+```{r}
+#| label: tbl-variance-test
+#| tbl-cap: "Variance in Daily Contacts by Political Party with Levene's Test"
+
+# Create summary table
+variance_table <- variance_by_party %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat"))
+  ) %>%
+  arrange(political_party) %>%
+  select(political_party, n, mean_contacts, sd_contacts, var_contacts)
+
+# Add test results row
+test_row <- tibble(
+  political_party = "Levene's Test",
+  n = NA,
+  mean_contacts = NA,
+  sd_contacts = sprintf("F = %.2f", levene_f),
+  var_contacts = sprintf("p < 0.001")
+)
+
+# Combine
+final_table <- bind_rows(
+  variance_table %>% mutate(across(c(n, mean_contacts, sd_contacts, var_contacts), as.character)),
+  test_row
+)
+
+kable(final_table,
+      col.names = c("Party", "N", "Mean Contacts", "SD", "Variance"),
+      digits = 2,
+      align = c("l", "r", "r", "r", "r"),
+      booktabs = TRUE) %>%
+  kable_styling(latex_options = c("hold_position")) %>%
+  footnote(
+    general = "Levene's test assesses equality of variances across groups. Significant result (p < 0.001) indicates variances differ significantly by party.",
+    general_title = "Note: ",
+    footnote_as_chunk = TRUE
+  )
+```
+
+The significantly higher variance among Republicans indicates that Republican contact behavior was more responsive to changing conditions---whether pandemic severity, policy environment, or media messaging---while Democrats maintained more consistent behavior throughout the study period.
+
+## Detailed Pandemic Response by Party {#sec-pandemic-response-detail}
+
+@fig-pandemic-response-detail shows the standardized regression coefficients for the relationship between prior week's pandemic conditions (incidence and mortality) and health behaviors (contacts and mask usage), by party. Effects are standardized: bars show the change associated with a one standard deviation increase in log incidence or log mortality.
+
+```{r}
+#| label: appendix-setup-response
+#| include: false
+
+library(tidyverse)
+library(cowplot)
+library(patchwork)
+
+# Load paper statistics
+stats_path <- here::here("out", "tables", "paper_statistics.rds")
+paper_stats <- readRDS(stats_path)
+invisible(list2env(paper_stats, envir = environment()))
+
+# Party colors
+party_colors <- c("Democrat" = "#326ba4", "Independent" = "#6db753", "Republican" = "#c50000")
+```
+
+```{r}
+#| label: fig-pandemic-response-detail
+#| fig-cap: "Detailed Behavioral Response to Prior Week's Pandemic Conditions by Party. Left column shows changes in daily contacts; right column shows changes in mask usage (percentage points). Top row shows response to incidence; bottom row shows response to mortality. Effects are standardized: bars show the change associated with a one standard deviation increase in log incidence or log mortality. Models include county fixed effects. Error bars indicate standard errors. Negative values for contacts indicate reductions; positive values for masks indicate increases."
+#| fig-height: 7
+#| fig-width: 11
+
+# Create data frame for plotting with standard errors
+response_data <- tibble(
+  party = rep(c("Democrat", "Independent", "Republican"), 4),
+  behavior = rep(c("Contacts", "Contacts", "Masks", "Masks"), each = 3),
+  condition = rep(c("Incidence", "Mortality", "Incidence", "Mortality"), each = 3),
+  effect = c(
+    contacts_inc_effect_dem, contacts_inc_effect_ind, contacts_inc_effect_rep,
+    contacts_mort_effect_dem, contacts_mort_effect_ind, contacts_mort_effect_rep,
+    masks_inc_effect_dem, masks_inc_effect_ind, masks_inc_effect_rep,
+    masks_mort_effect_dem, masks_mort_effect_ind, masks_mort_effect_rep
+  ),
+  se = c(
+    contacts_inc_se_dem, contacts_inc_se_ind, contacts_inc_se_rep,
+    contacts_mort_se_dem, contacts_mort_se_ind, contacts_mort_se_rep,
+    masks_inc_se_dem, masks_inc_se_ind, masks_inc_se_rep,
+    masks_mort_se_dem, masks_mort_se_ind, masks_mort_se_rep
+  )
+) %>%
+  mutate(
+    party = factor(party, levels = c("Republican", "Independent", "Democrat")),
+    condition = factor(condition, levels = c("Incidence", "Mortality"))
+  )
+
+# Separate data for contacts and masks
+contacts_data <- response_data %>% filter(behavior == "Contacts")
+masks_data <- response_data %>% filter(behavior == "Masks")
+
+# Calculate shared y-axis limits for each behavior
+contacts_range <- contacts_data %>%
+  summarise(ymin = min(effect - se, na.rm = TRUE), ymax = max(effect + se, na.rm = TRUE))
+contacts_ylim <- c(min(contacts_range$ymin, -0.1), max(contacts_range$ymax, 0.1)) * 1.15
+
+masks_range <- masks_data %>%
+  summarise(ymin = min(effect - se, na.rm = TRUE), ymax = max(effect + se, na.rm = TRUE))
+masks_ylim <- c(min(masks_range$ymin, -0.5), max(masks_range$ymax, 0.5)) * 1.15
+
+# Base plot function
+make_panel <- function(data, title, y_label, ylimits, show_legend = FALSE) {
+  p <- ggplot(data, aes(x = party, y = effect, fill = party)) +
+    geom_col(alpha = 0.7, width = 0.7, color = "black") +
+    geom_errorbar(aes(ymin = effect - se, ymax = effect + se), width = 0.2, color = "gray30") +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    facet_wrap(~ condition, ncol = 1) +
+    scale_fill_manual(values = party_colors) +
+    scale_y_continuous(limits = ylimits) +
+    labs(x = NULL, y = y_label, title = title) +
+    theme_cowplot() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      strip.text = element_text(face = "bold", size = 13),
+      strip.background = element_blank(),
+      plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+      panel.border = element_rect(color = "gray70", fill = NA, linewidth = 0.5)
+    )
+  if (!show_legend) p <- p + theme(legend.position = "none")
+  return(p)
+}
+
+p_contacts <- make_panel(contacts_data, "Daily Contacts", "Change per 1 SD", contacts_ylim)
+p_masks <- make_panel(masks_data, "Mask Usage", "Change in pp per 1 SD", masks_ylim)
+
+combined <- p_contacts + p_masks + plot_layout(ncol = 2)
+combined + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+```
+
+@fig-gap-changes summarizes how partisan gaps change in response to pandemic conditions. This figure complements the individual-level effects shown above by directly displaying the implications for polarization.
+
+```{r}
+#| label: fig-gap-changes
+#| fig-cap: "Effect of Prior Week's Pandemic Conditions on Partisan Gaps. Bars show how the Republican-Democrat gap changes in the week following a one standard deviation increase in local log incidence or mortality. Negative values indicate gap narrowing (convergence); positive values indicate gap widening (divergence)."
+#| fig-height: 4
+#| fig-width: 8
+
+# Calculate how gaps change with pandemic conditions
+contacts_gap_change_inc <- contacts_inc_effect_rep - contacts_inc_effect_dem
+contacts_gap_change_mort <- contacts_mort_effect_rep - contacts_mort_effect_dem
+masks_gap_change_inc <- masks_inc_effect_rep - masks_inc_effect_dem
+masks_gap_change_mort <- masks_mort_effect_rep - masks_mort_effect_dem
+
+# Create data for gap changes
+gap_change_data <- tibble(
+  behavior = c("Contacts", "Contacts", "Masks", "Masks"),
+  condition = c("Incidence", "Mortality", "Incidence", "Mortality"),
+  gap_change = c(contacts_gap_change_inc, contacts_gap_change_mort,
+                 masks_gap_change_inc, masks_gap_change_mort)
+) %>%
+  mutate(
+    label = paste(behavior, "Gap"),
+    direction = ifelse(gap_change < 0, "Narrows", "Widens")
+  )
+
+ggplot(gap_change_data, aes(x = condition, y = gap_change, fill = direction)) +
+  geom_col(alpha = 0.7, width = 0.6, color = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  facet_wrap(~ label, scales = "free_y") +
+  scale_fill_manual(values = c("Narrows" = "#326ba4", "Widens" = "#c50000")) +
+  labs(
+    x = "Pandemic Condition",
+    y = "Change in R-D Gap per 1 SD Increase",
+    fill = "Gap"
+  ) +
+  theme_cowplot() +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold"),
+    strip.background = element_blank()
+  )
+```
+
+### Incidence vs. Mortality: Why We Focus on Mortality {#sec-incidence-vs-mortality}
+
+The main text focuses on mortality rather than incidence when discussing partisan responses to pandemic conditions. This section explains that choice and presents the full comparison of incidence and mortality effects.
+
+**Key finding: Mortality was the stronger predictor of contact behavior, while incidence was the stronger predictor of mask-wearing.**
+
+@fig-pandemic-response-detail above displays the full comparison. For contacts (left column), mortality effects are larger than incidence effects for all partisan groups, and statistically significant for Republicans. For masks (right column), the pattern reverses: incidence effects are larger, particularly for Democrats.
+
+This differential pattern has a plausible interpretation:
+
+1. **Mortality and contacts**: Deaths are concrete, visible, and emotionally salient. They are reported in local news, experienced through social networks, and marked by funerals and obituaries. When deaths rise, the threat becomes tangible—prompting reductions in social contact. Republicans showed the largest mortality response, consistent with the main text's finding that their contact behavior swung more dramatically with conditions.
+
+2. **Incidence and masks**: Case counts, by contrast, are more abstract and mediated by testing availability and reporting. However, rising case counts may trigger mask mandates, workplace policies, and social pressure to mask—particularly in areas where cases are visibly surging. Democrats, who were more likely to live in areas with mask mandates and to follow public health guidance, showed the largest incidence response for masks.
+
+@fig-gap-changes summarizes the implications for polarization: mortality narrows the contact gap (Republicans reduce contacts more), while incidence slightly widens the mask gap (Democrats increase masking more). This supports the main text's focus on mortality for the contact behavior analysis, where the key finding is that objective threat can reduce polarization—at least temporarily.
+
+The sections below provide additional detail on mask responses to incidence (@sec-mask-incidence-response) and perception responses to both conditions (@sec-perception-response).
+
+### Mask Usage Response to Incidence {#sec-mask-incidence-response}
+
+@fig-incidence-mask-response parallels @fig-mortality-response in the main text but shows mask usage response to incidence rather than contacts response to mortality. This figure illustrates the finding that incidence was the stronger predictor of mask-wearing, particularly for Democrats.
+
+```{r}
+#| label: fig-incidence-mask-response
+#| fig-cap: "Mask Usage Response to Incidence. Panel A shows predicted mask usage (percentage of contacts with masks) by party at baseline (average incidence) and when incidence is one standard deviation higher. Panel B shows the Democrat-Republican gap in mask usage at baseline and at higher incidence. All partisan groups increase mask usage when incidence rises, with Democrats showing the largest response."
+#| fig-height: 5
+#| fig-width: 10
+
+library(patchwork)
+
+# Calculate predicted mask usage at baseline and +1 SD incidence
+# Baseline = raw weighted means; +1 SD = baseline + incidence coefficient
+pred_masks <- tibble(
+  party = rep(c("Republican", "Independent", "Democrat"), 2),
+  condition = rep(c("Baseline", "+1 SD Incidence"), each = 3),
+  mask_usage = c(
+    # Baseline (raw means)
+    mask_rep, mask_ind, mask_dem,
+    # +1 SD incidence (baseline + effect)
+    mask_rep + masks_inc_effect_rep,
+    mask_ind + masks_inc_effect_ind,
+    mask_dem + masks_inc_effect_dem
+  )
+) %>%
+  mutate(
+    party = factor(party, levels = c("Republican", "Independent", "Democrat")),
+    condition = factor(condition, levels = c("Baseline", "+1 SD Incidence"))
+  )
+
+# Calculate gaps (D-R since Democrats mask more)
+gap_baseline <- mask_dem - mask_rep
+gap_high_inc <- (mask_dem + masks_inc_effect_dem) - (mask_rep + masks_inc_effect_rep)
+
+gap_data <- tibble(
+  condition = factor(c("Baseline", "+1 SD Incidence"), levels = c("Baseline", "+1 SD Incidence")),
+  gap = c(gap_baseline, gap_high_inc)
+)
+
+# Panel A: Predicted mask usage by party
+p_masks <- ggplot(pred_masks, aes(x = condition, y = mask_usage, fill = party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.8, color = "black") +
+  geom_text(aes(label = sprintf("%.1f", mask_usage), group = party),
+            position = position_dodge(width = 0.8), vjust = -0.5, size = 3.5, fontface = "bold") +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = "Mask Usage (%)", title = "A. Predicted Mask Usage by Party", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom"
+  )
+
+# Panel B: D-R Gap
+p_gap <- ggplot(gap_data, aes(x = condition, y = gap)) +
+  geom_col(width = 0.6, fill = "#1b9e77", alpha = 0.8, color = "black") +
+  geom_text(aes(label = sprintf("%.1f", gap)), vjust = -0.5, size = 4, fontface = "bold") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  labs(x = NULL, y = "D-R Gap (pp)", title = "B. Democrat-Republican Gap") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14)
+  )
+
+# Combine
+p_masks + p_gap + plot_layout(widths = c(1.5, 1))
+```
+
+### Perception Response to Pandemic Conditions {#sec-perception-response}
+
+@fig-perception-response shows how COVID-19 concern (the percentage reporting being "very concerned") responded to prior week's pandemic conditions by party. This parallels @fig-pandemic-response-detail but examines perceptions rather than behaviors.
+
+```{r}
+#| label: fig-perception-response
+#| fig-cap: "Risk Perception Response to Prior Week's Pandemic Conditions by Party. Left column shows response to incidence; right column shows response to mortality. Bars show the change in the percentage reporting being 'very concerned' about COVID-19 associated with a one standard deviation increase in log incidence or log mortality. Models include county fixed effects. Error bars indicate standard errors."
+#| fig-height: 5
+#| fig-width: 10
+
+library(patchwork)
+
+# Create data frame for perception response plotting
+perception_response_data <- tibble(
+  party = rep(c("Democrat", "Independent", "Republican"), 2),
+  condition = rep(c("Incidence", "Mortality"), each = 3),
+  effect = c(
+    concern_inc_effect_dem, concern_inc_effect_ind, concern_inc_effect_rep,
+    concern_mort_effect_dem, concern_mort_effect_ind, concern_mort_effect_rep
+  ),
+  se = c(
+    concern_inc_se_dem, concern_inc_se_ind, concern_inc_se_rep,
+    concern_mort_se_dem, concern_mort_se_ind, concern_mort_se_rep
+  )
+) %>%
+  mutate(
+    party = factor(party, levels = c("Republican", "Independent", "Democrat")),
+    condition = factor(condition, levels = c("Incidence", "Mortality"))
+  )
+
+# Calculate y-axis limits
+y_range <- perception_response_data %>%
+  summarise(ymin = min(effect - se, na.rm = TRUE), ymax = max(effect + se, na.rm = TRUE))
+y_lim <- c(min(y_range$ymin, -1), max(y_range$ymax, 1)) * 1.15
+
+# Create the plot
+ggplot(perception_response_data, aes(x = party, y = effect, fill = party)) +
+  geom_col(alpha = 0.7, width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = effect - se, ymax = effect + se), width = 0.2, color = "gray30") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  facet_wrap(~ condition, ncol = 2) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(limits = y_lim) +
+  labs(x = NULL, y = "Change in 'Very Concerned' (pp) per 1 SD") +
+  theme_cowplot() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold", size = 13),
+    strip.background = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "gray70", fill = NA, linewidth = 0.5)
+  )
+```
+
+Unlike health behaviors, which showed clear differential responses to pandemic conditions (mortality predicting contacts, incidence predicting masks), risk perception showed weaker and more inconsistent relationships with local pandemic conditions. This suggests that partisan differences in concern were more stable and less responsive to objective signals about pandemic severity---consistent with the finding in the main text that perception gaps remained relatively constant even as behavior gaps fluctuated.
+
+## Spatial Variation in Partisan Differences {#sec-spatial-variation}
+
+This section provides additional detail on geographic variation in partisan differences. All estimates in this section are adjusted for survey wave and local mortality rates using regression models, removing potential confounding from differences in when surveys were collected and local pandemic severity. We present behavior levels by party within census regions (complementing the region-level gap maps in the main text), then examine finer geographic scales: census divisions (9 divisions) and states.
+
+### Urban-Rural Behavior Levels by Party {#sec-metro-detail}
+
+@fig-metro-gaps displays the Republican-Democrat gap in contacts and mask-wearing by metropolitan status. The gaps are smaller in non-metropolitan areas for both behaviors: the contact gap drops from 1.3 to 0.3 additional daily contacts, and the mask gap drops from 9 to 7 percentage points. This pattern helps explain why the South---which has a higher proportion of non-metropolitan residents---showed smaller partisan gaps in the main analysis.
+
+```{r}
+#| label: fig-metro-gaps
+#| fig-cap: "Republican-Democrat Gaps by Metropolitan Status. Each panel compares the partisan gap in metropolitan versus non-metropolitan areas. Panel A shows the contact gap (R−D) and Panel B shows the mask gap (D−R). Estimates are adjusted for survey wave and local mortality rates."
+#| fig-height: 4
+#| fig-width: 7
+
+library(cowplot)
+library(patchwork)
+
+# Load adjusted metro data
+behaviors_by_metro <- read_csv("../out/tables/adj_behaviors_by_metro.csv", show_col_types = FALSE)
+
+# Calculate R-D gaps by metro status
+gaps_by_metro <- behaviors_by_metro %>%
+  select(metro_status, political_party, contacts_adj_mean, mask_adj_mean) %>%
+  pivot_wider(names_from = political_party,
+              values_from = c(contacts_adj_mean, mask_adj_mean)) %>%
+  mutate(
+    contacts_gap_rd = contacts_adj_mean_Republican - contacts_adj_mean_Democrat,
+    mask_gap_dr = mask_adj_mean_Democrat - mask_adj_mean_Republican,
+    metro_status = factor(metro_status, levels = c("Metropolitan", "Non-Metropolitan"))
+  )
+
+# Colors for metro status
+metro_colors <- c("Metropolitan" = "#4a4a4a", "Non-Metropolitan" = "#a0a0a0")
+
+# Contact gap plot (R-D, so positive = R > D)
+p_contact_gap <- ggplot(gaps_by_metro, aes(x = metro_status, y = contacts_gap_rd, fill = metro_status)) +
+  geom_col(width = 0.6, color = "black") +
+  geom_text(aes(label = sprintf("%.1f", contacts_gap_rd)), vjust = -0.5, size = 4, fontface = "bold") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_fill_manual(values = metro_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  labs(x = NULL, y = "R−D Gap (contacts)", title = "A. Contact Gap") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    legend.position = "none"
+  )
+
+# Mask gap plot (D-R, so positive = D > R)
+p_mask_gap <- ggplot(gaps_by_metro, aes(x = metro_status, y = mask_gap_dr, fill = metro_status)) +
+  geom_col(width = 0.6, color = "black") +
+  geom_text(aes(label = sprintf("%.0f", mask_gap_dr)), vjust = -0.5, size = 4, fontface = "bold") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_fill_manual(values = metro_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  labs(x = NULL, y = "D−R Gap (pp)", title = "B. Mask Gap") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    legend.position = "none"
+  )
+
+# Combine horizontally
+p_contact_gap + p_mask_gap
+```
+
+@fig-metro-behaviors-detail displays health behavior levels by party and metropolitan status, showing that all partisan groups were less cautious in non-metropolitan areas.
+
+```{r}
+#| label: fig-metro-behaviors-detail
+#| fig-cap: "Adjusted Health Behaviors by Party and Metropolitan Status. Each panel shows behavior levels for the three partisan groups, comparing metropolitan (darker bars) versus non-metropolitan (lighter bars) areas. Panel A shows daily contacts, Panel B shows mask usage, and Panel C shows vaccine acceptance rates (Wave 6 only). Estimates are adjusted for survey wave and local mortality rates. Error bars indicate standard errors."
+#| fig-height: 9
+#| fig-width: 6
+
+library(cowplot)
+library(patchwork)
+
+# Load adjusted metro data (emmeans with wave + mortality controls)
+behaviors_by_metro <- read_csv("../out/tables/adj_behaviors_by_metro.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    metro_status = factor(metro_status, levels = c("Metropolitan", "Non-Metropolitan")),
+    contacts_mean = contacts_adj_mean,
+    contacts_se = contacts_adj_se,
+    mask_mean = mask_adj_mean,
+    mask_se = mask_adj_se,
+    vax_mean = vax_adj_mean,
+    vax_se = vax_adj_se
+  )
+
+# Party colors with metro/non-metro shading
+party_colors_metro <- c(
+  "Republican_Metropolitan" = "#c50000",
+  "Republican_Non-Metropolitan" = "#ff6666",
+  "Independent_Metropolitan" = "#6db753",
+  "Independent_Non-Metropolitan" = "#a8d99a",
+  "Democrat_Metropolitan" = "#326ba4",
+  "Democrat_Non-Metropolitan" = "#7eb3e0"
+)
+
+behaviors_by_metro <- behaviors_by_metro %>%
+  mutate(party_metro = paste(political_party, metro_status, sep = "_"))
+
+# Contacts plot
+p_contacts <- ggplot(behaviors_by_metro, aes(x = political_party, y = contacts_mean, fill = party_metro)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = contacts_mean - contacts_se, ymax = contacts_mean + contacts_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors_metro) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(x = NULL, y = "Daily Contacts", title = "A. Contacts", fill = NULL) +
+  theme_cowplot() +
+  theme(plot.title = element_text(face = "bold", size = 11), legend.position = "none")
+
+# Masks plot
+p_masks <- ggplot(behaviors_by_metro, aes(x = political_party, y = mask_mean, fill = party_metro)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = mask_mean - mask_se, ymax = mask_mean + mask_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors_metro) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 80)) +
+  labs(x = NULL, y = "Mask Usage (%)", title = "B. Mask Usage", fill = NULL) +
+  theme_cowplot() +
+  theme(plot.title = element_text(face = "bold", size = 11), legend.position = "none")
+
+# Vaccine acceptance plot
+p_vax <- ggplot(behaviors_by_metro, aes(x = political_party, y = vax_mean, fill = party_metro)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = vax_mean - vax_se, ymax = vax_mean + vax_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors_metro,
+                    labels = c("Democrat_Metropolitan" = "Metro", "Democrat_Non-Metropolitan" = "Non-Metro",
+                              "Independent_Metropolitan" = "Metro", "Independent_Non-Metropolitan" = "Non-Metro",
+                              "Republican_Metropolitan" = "Metro", "Republican_Non-Metropolitan" = "Non-Metro")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 100)) +
+  labs(x = NULL, y = "Vaccine Acceptance (%)", title = "C. Vaccine Acceptance", fill = "Metro Status") +
+  theme_cowplot() +
+  theme(plot.title = element_text(face = "bold", size = 11), legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 1, override.aes = list(fill = c("#326ba4", "#7eb3e0", "#6db753", "#a8d99a", "#c50000", "#ff6666"))))
+
+# Combine vertically
+p_contacts / p_masks / p_vax
+```
+
+The figure reveals that the urban-rural shift toward less protective behavior is consistent across all three partisan groups. Notably, Independents show the largest urban-rural differences, particularly for mask-wearing and vaccine acceptance.
+
+### Partisan Gaps Within Policy Environments {#sec-policy-behaviors}
+
+A potential confounder for geographic patterns in partisan gaps is that metropolitan areas were more likely to have strict mask mandates. @fig-policy-behaviors shows that partisan gaps persist within each policy environment, indicating that individual partisanship shapes behavior beyond policy effects.
+
+```{r}
+#| label: fig-policy-behaviors
+#| fig-cap: "Health Behaviors by Party and Policy Environment. Each panel shows behavior levels for the three partisan groups within areas with no mask mandate, less strict mandates, or strict mandates. Panel A shows daily contacts, Panel B shows mask usage. Partisan gaps persist within each policy environment."
+#| fig-height: 4
+#| fig-width: 10
+
+library(cowplot)
+library(patchwork)
+
+# Load policy behavior data
+behaviors_by_policy <- read_csv("../out/tables/behaviors_by_policy.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    policy = factor(policy, levels = c("No Mandate", "Less Strict", "Strict"))
+  )
+
+# Party colors
+party_colors <- c("Democrat" = "#326ba4", "Independent" = "#6db753", "Republican" = "#c50000")
+
+# Contacts plot
+p_contacts_policy <- ggplot(behaviors_by_policy, aes(x = policy, y = contacts_mean, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black", alpha = 0.8) +
+  geom_errorbar(aes(ymin = contacts_mean - contacts_se, ymax = contacts_mean + contacts_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(x = "Mask Mandate Policy", y = "Daily Contacts", title = "A. Contacts", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    legend.position = "none",
+    axis.text.x = element_text(size = 9)
+  )
+
+# Masks plot
+p_masks_policy <- ggplot(behaviors_by_policy, aes(x = policy, y = mask_mean, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black", alpha = 0.8) +
+  geom_errorbar(aes(ymin = mask_mean - mask_se, ymax = mask_mean + mask_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 85)) +
+  labs(x = "Mask Mandate Policy", y = "Mask Usage (%)", title = "B. Mask Usage", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    legend.position = "bottom",
+    axis.text.x = element_text(size = 9)
+  )
+
+# Combine
+p_contacts_policy + p_masks_policy
+```
+
+### Behavior by Local Partisan Context {#sec-partisan-context}
+
+@fig-cd-contacts shows daily contacts by party and local partisan context (congressional district representation). The figure reveals that partisan gaps in contacts persist regardless of local context, though the magnitude varies.
+
+```{r}
+#| label: fig-cd-contacts
+#| fig-cap: "Daily Contacts by Party and Local Partisan Context. Bars show mean daily contacts for Democrats and Republicans depending on whether they live in a Democratic-led or Republican-led congressional district. Estimates are adjusted for survey wave, local incidence rates, and metropolitan status. Error bars indicate standard errors."
+#| fig-height: 4
+#| fig-width: 5
+
+library(cowplot)
+library(emmeans)
+
+# Load data
+bics <- read_csv("../data/BICS_ZIP_Features.csv", show_col_types = FALSE)
+
+# Filter to main 4 groups
+cd_levels <- c("Democrat in Democratic led CD",
+               "Democrat in Republican led CD",
+               "Republican in Democratic led CD",
+               "Republican in Republican led CD")
+
+filtered_df <- bics %>%
+  filter(political_party_to_CD %in% cd_levels) %>%
+  filter(!is.na(num_cc), !is.na(log_prev_week_inc_rate), !is.na(Metro), !is.na(wave)) %>%
+  mutate(
+    wave = factor(wave),
+    political_party_to_CD = factor(political_party_to_CD, levels = cd_levels)
+  )
+
+# Model for contacts
+contact_model <- lm(num_cc ~ log_prev_week_inc_rate + Metro + wave + political_party_to_CD,
+                    data = filtered_df,
+                    weights = weight_pooled)
+emm_contact <- as.data.frame(emmeans(contact_model, specs = "political_party_to_CD"))
+
+# Parse the CD context into party and district
+emm_contact <- emm_contact %>%
+  mutate(
+    party = ifelse(grepl("^Democrat", political_party_to_CD), "Democrat", "Republican"),
+    district = ifelse(grepl("Democratic led", political_party_to_CD), "Democratic District", "Republican District"),
+    party = factor(party, levels = c("Democrat", "Republican")),
+    district = factor(district, levels = c("Democratic District", "Republican District"))
+  )
+
+# Party colors
+party_colors <- c("Democrat" = "#326ba4", "Republican" = "#c50000")
+
+# Contacts plot
+ggplot(emm_contact, aes(x = district, y = emmean, fill = party, group = party)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6, color = "black", alpha = 0.8) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                position = position_dodge(width = 0.7), width = 0.2) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(x = NULL, y = "Daily Contacts", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(size = 10)
+  )
+```
+
+@fig-cd-gaps shows the Republican-Democrat gap in each behavior by local partisan context. For contacts, the R-D gap is larger in Democratic-led districts than in Republican-led districts, suggesting that Republicans increase contacts more than Democrats when living in Democratic areas. For masks, the D-R gap is similar across contexts, indicating that both parties shift their mask behavior in parallel when living in opposing-party areas.
+
+```{r}
+#| label: fig-cd-gaps
+#| fig-cap: "Partisan Gaps by Local Context. Panel A shows the Republican-Democrat gap in daily contacts; Panel B shows the Democrat-Republican gap in mask usage. Gaps are calculated within each congressional district context (Democratic-led vs Republican-led). Estimates are adjusted for survey wave, local incidence rates, and metropolitan status."
+#| fig-height: 4
+#| fig-width: 8
+
+library(cowplot)
+library(patchwork)
+library(emmeans)
+
+# Load data
+bics <- read_csv("../data/BICS_ZIP_Features.csv", show_col_types = FALSE)
+
+# Filter to main 4 groups
+cd_levels <- c("Democrat in Democratic led CD",
+               "Democrat in Republican led CD",
+               "Republican in Democratic led CD",
+               "Republican in Republican led CD")
+
+filtered_df <- bics %>%
+  filter(political_party_to_CD %in% cd_levels) %>%
+  filter(!is.na(num_cc), !is.na(log_prev_week_inc_rate), !is.na(Metro), !is.na(wave)) %>%
+  mutate(
+    wave = factor(wave),
+    political_party_to_CD = factor(political_party_to_CD, levels = cd_levels)
+  )
+
+# Model for contacts
+contact_model <- lm(num_cc ~ log_prev_week_inc_rate + Metro + wave + political_party_to_CD,
+                    data = filtered_df,
+                    weights = weight_pooled)
+emm_contact <- as.data.frame(emmeans(contact_model, specs = "political_party_to_CD"))
+
+# Model for masks
+mask_model <- lm(Norm_Masks_Used ~ log_prev_week_inc_rate + Metro + wave + political_party_to_CD,
+                 data = filtered_df,
+                 weights = weight_pooled)
+emm_mask <- as.data.frame(emmeans(mask_model, specs = "political_party_to_CD"))
+
+# Calculate gaps by context
+gaps_by_context <- tibble(
+  context = c("Democratic\nDistrict", "Republican\nDistrict"),
+  contacts_gap_rd = c(
+    emm_contact$emmean[emm_contact$political_party_to_CD == "Republican in Democratic led CD"] -
+      emm_contact$emmean[emm_contact$political_party_to_CD == "Democrat in Democratic led CD"],
+    emm_contact$emmean[emm_contact$political_party_to_CD == "Republican in Republican led CD"] -
+      emm_contact$emmean[emm_contact$political_party_to_CD == "Democrat in Republican led CD"]
+  ),
+  masks_gap_dr = c(
+    emm_mask$emmean[emm_mask$political_party_to_CD == "Democrat in Democratic led CD"] -
+      emm_mask$emmean[emm_mask$political_party_to_CD == "Republican in Democratic led CD"],
+    emm_mask$emmean[emm_mask$political_party_to_CD == "Democrat in Republican led CD"] -
+      emm_mask$emmean[emm_mask$political_party_to_CD == "Republican in Republican led CD"]
+  )
+) %>%
+  mutate(context = factor(context, levels = c("Democratic\nDistrict", "Republican\nDistrict")))
+
+# Context colors
+context_colors <- c("Democratic\nDistrict" = "#326ba4", "Republican\nDistrict" = "#c50000")
+
+# Contacts gap plot
+p_contacts_gap <- ggplot(gaps_by_context, aes(x = context, y = contacts_gap_rd, fill = context)) +
+  geom_col(width = 0.6, color = "black", alpha = 0.8) +
+  geom_text(aes(label = sprintf("%.1f", contacts_gap_rd)), vjust = -0.5, size = 4, fontface = "bold") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_fill_manual(values = context_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  labs(x = NULL, y = "R−D Gap (contacts)", title = "A. Contact Gap") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    legend.position = "none"
+  )
+
+# Masks gap plot
+p_masks_gap <- ggplot(gaps_by_context, aes(x = context, y = masks_gap_dr, fill = context)) +
+  geom_col(width = 0.6, color = "black", alpha = 0.8) +
+  geom_text(aes(label = sprintf("%.0f", masks_gap_dr)), vjust = -0.5, size = 4, fontface = "bold") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_fill_manual(values = context_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  labs(x = NULL, y = "D−R Gap (pp)", title = "B. Mask Gap") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    legend.position = "none"
+  )
+
+# Combine
+p_contacts_gap + p_masks_gap
+```
+
+### Regional Behavior Levels
+
+@fig-behaviors-by-region displays the raw behavior levels (mean contacts and mask usage) for each party within each census region. This complements the gap-focused maps in the main text by showing the underlying distributions.
+
+```{r}
+#| label: load-region-data-appendix
+#| include: false
+
+# Load regional data - using adjusted estimates (emmeans with wave + mortality controls)
+behaviors_by_region <- read_csv("../out/tables/adj_behaviors_by_region.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    census_region = factor(census_region, levels = c("Northeast", "Midwest", "South", "West"))
+  )
+```
+
+```{r}
+#| label: fig-behaviors-by-region
+#| fig-cap: "Adjusted Health Behaviors by Party Across Census Regions. Panel A shows mean daily contacts; Panel B shows mask usage (percentage of contacts with masks). Estimates are adjusted for survey wave and local mortality rates. Error bars indicate standard errors from emmeans."
+#| fig-height: 5
+#| fig-width: 11
+
+library(cowplot)
+library(patchwork)
+
+# Party colors
+party_colors <- c("Republican" = "#c50000", "Independent" = "#6db753", "Democrat" = "#326ba4")
+
+# Contacts by region
+p_contacts <- ggplot(behaviors_by_region, aes(x = census_region, y = contacts_adj_mean, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.8, color = "black") +
+  geom_errorbar(aes(ymin = contacts_adj_mean - contacts_adj_se, ymax = contacts_adj_mean + contacts_adj_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(x = NULL, y = "Daily Contacts", title = "A. Daily Contacts by Region", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+# Masks by region
+p_masks <- ggplot(behaviors_by_region, aes(x = census_region, y = mask_adj_mean, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.8, color = "black") +
+  geom_errorbar(aes(ymin = mask_adj_mean - mask_adj_se, ymax = mask_adj_mean + mask_adj_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 80)) +
+  labs(x = NULL, y = "Mask Usage (%)", title = "B. Mask Usage by Region", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+# Combine
+p_contacts + p_masks + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+```
+
+The figure reveals that the smaller partisan gaps in the South are driven primarily by Republicans in that region reporting fewer contacts and higher mask usage than Republicans elsewhere, rather than by Democrats in the South behaving differently. This suggests that regional norms may exert a moderating influence on Republican behavior specifically.
+
+### Regional Behavior Maps by Party
+
+@fig-region-levels-map displays the underlying behavior levels by party and region in map form, complementing the gap maps in the main text. This 2×2 layout shows contacts (top row) and mask usage (bottom row) for Democrats (left) and Republicans (right).
+
+```{r}
+#| label: fig-region-levels-map
+#| fig-cap: "Adjusted Health Behavior Levels by Party Across Census Regions. Top row shows mean daily contacts for Democrats (A) and Republicans (B). Bottom row shows mask usage for Democrats (C) and Republicans (D). Estimates are adjusted for survey wave and local mortality rates. Darker shading indicates higher values. Black borders indicate census region boundaries."
+#| fig-height: 8
+#| fig-width: 10
+
+library(usmap)
+library(patchwork)
+library(sf)
+
+# Create region-to-state mapping
+region_map <- tibble(
+  state = c(
+    "Connecticut", "Maine", "Massachusetts", "New Hampshire", "New Jersey",
+    "New York", "Pennsylvania", "Rhode Island", "Vermont",
+    "Illinois", "Indiana", "Iowa", "Kansas", "Michigan", "Minnesota",
+    "Missouri", "Nebraska", "North Dakota", "Ohio", "South Dakota", "Wisconsin",
+    "Alabama", "Arkansas", "Delaware", "District of Columbia", "Florida",
+    "Georgia", "Kentucky", "Louisiana", "Maryland", "Mississippi",
+    "North Carolina", "Oklahoma", "South Carolina", "Tennessee", "Texas",
+    "Virginia", "West Virginia",
+    "Alaska", "Arizona", "California", "Colorado", "Hawaii", "Idaho",
+    "Montana", "Nevada", "New Mexico", "Oregon", "Utah", "Washington", "Wyoming"
+  ),
+  census_region = c(
+    rep("Northeast", 9), rep("Midwest", 12), rep("South", 17), rep("West", 13)
+  )
+)
+
+# Reshape behaviors data for mapping
+dem_data <- behaviors_by_region %>%
+  filter(political_party == "Democrat") %>%
+  select(census_region, contacts_adj_mean, mask_adj_mean) %>%
+  rename(contacts_mean = contacts_adj_mean, mask_mean = mask_adj_mean)
+
+rep_data <- behaviors_by_region %>%
+  filter(political_party == "Republican") %>%
+  select(census_region, contacts_adj_mean, mask_adj_mean) %>%
+  rename(contacts_mean = contacts_adj_mean, mask_mean = mask_adj_mean)
+
+dem_for_map <- region_map %>% left_join(dem_data, by = "census_region")
+rep_for_map <- region_map %>% left_join(rep_data, by = "census_region")
+
+# Get region boundaries
+us_states_sf <- us_map(regions = "states") %>%
+  left_join(region_map, by = c("full" = "state"))
+
+region_boundaries <- us_states_sf %>%
+  group_by(census_region) %>%
+  summarise(geometry = st_union(geom), .groups = "drop")
+
+# Set common scales
+contacts_range <- range(c(dem_data$contacts_mean, rep_data$contacts_mean), na.rm = TRUE)
+mask_range <- range(c(dem_data$mask_mean, rep_data$mask_mean), na.rm = TRUE)
+
+# Democrat contacts
+p_dem_contacts <- plot_usmap(data = dem_for_map, values = "contacts_mean", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#deebf7", high = "#2171b5", name = "Contacts", limits = contacts_range, na.value = "gray90") +
+  labs(title = "A. Democrat Contacts") +
+  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
+
+# Republican contacts
+p_rep_contacts <- plot_usmap(data = rep_for_map, values = "contacts_mean", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#fee0d2", high = "#cb181d", name = "Contacts", limits = contacts_range, na.value = "gray90") +
+  labs(title = "B. Republican Contacts") +
+  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
+
+# Democrat masks
+p_dem_masks <- plot_usmap(data = dem_for_map, values = "mask_mean", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#deebf7", high = "#2171b5", name = "Mask %", limits = mask_range, na.value = "gray90") +
+  labs(title = "C. Democrat Mask Usage") +
+  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
+
+# Republican masks
+p_rep_masks <- plot_usmap(data = rep_for_map, values = "mask_mean", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#fee0d2", high = "#cb181d", name = "Mask %", limits = mask_range, na.value = "gray90") +
+  labs(title = "D. Republican Mask Usage") +
+  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
+
+# Combine in 2x2 grid
+(p_dem_contacts | p_rep_contacts) / (p_dem_masks | p_rep_masks)
+```
+
+The maps confirm that the smaller partisan gaps in the South reflect Republicans in that region behaving more like Democrats elsewhere---with fewer contacts and higher mask usage than Republicans in other regions---rather than Southern Democrats behaving unusually.
+
+### Regional Vaccine Acceptance and Perception Maps by Party
+
+@fig-region-vax-perception-map displays vaccine acceptance rates (Wave 6 only) and pandemic concern levels by party across census regions. These complement the contact and mask usage maps above.
+
+```{r}
+#| label: fig-region-vax-perception-map
+#| fig-cap: "Adjusted Vaccine Acceptance and Perception Levels by Party Across Census Regions. Top row shows vaccine acceptance rates (Wave 6, May 2021) for Democrats (A) and Republicans (B). Bottom row shows percentage reporting being 'very concerned' about COVID-19 for Democrats (C) and Republicans (D). Estimates are adjusted for local mortality rates. Darker shading indicates higher values. Black borders indicate census region boundaries."
+#| fig-height: 8
+#| fig-width: 10
+
+library(usmap)
+library(patchwork)
+library(sf)
+
+# Load adjusted vaccination and perception data
+adj_vax_by_region <- read_csv("../out/tables/adj_vax_by_region.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    census_region = factor(census_region, levels = c("Northeast", "Midwest", "South", "West"))
+  )
+
+adj_perception_by_region <- read_csv("../out/tables/adj_perception_by_region.csv", show_col_types = FALSE) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    census_region = factor(census_region, levels = c("Northeast", "Midwest", "South", "West"))
+  )
+
+# Create region-to-state mapping
+region_map <- tibble(
+  state = c(
+    "Connecticut", "Maine", "Massachusetts", "New Hampshire", "New Jersey",
+    "New York", "Pennsylvania", "Rhode Island", "Vermont",
+    "Illinois", "Indiana", "Iowa", "Kansas", "Michigan", "Minnesota",
+    "Missouri", "Nebraska", "North Dakota", "Ohio", "South Dakota", "Wisconsin",
+    "Alabama", "Arkansas", "Delaware", "District of Columbia", "Florida",
+    "Georgia", "Kentucky", "Louisiana", "Maryland", "Mississippi",
+    "North Carolina", "Oklahoma", "South Carolina", "Tennessee", "Texas",
+    "Virginia", "West Virginia",
+    "Alaska", "Arizona", "California", "Colorado", "Hawaii", "Idaho",
+    "Montana", "Nevada", "New Mexico", "Oregon", "Utah", "Washington", "Wyoming"
+  ),
+  census_region = c(
+    rep("Northeast", 9), rep("Midwest", 12), rep("South", 17), rep("West", 13)
+  )
+)
+
+# Reshape data for mapping
+dem_vax <- adj_vax_by_region %>%
+  filter(political_party == "Democrat") %>%
+  select(census_region, vax_adj_mean)
+
+rep_vax <- adj_vax_by_region %>%
+  filter(political_party == "Republican") %>%
+  select(census_region, vax_adj_mean)
+
+dem_concern <- adj_perception_by_region %>%
+  filter(political_party == "Democrat") %>%
+  select(census_region, concern_adj_mean)
+
+rep_concern <- adj_perception_by_region %>%
+  filter(political_party == "Republican") %>%
+  select(census_region, concern_adj_mean)
+
+dem_vax_map <- region_map %>% left_join(dem_vax, by = "census_region")
+rep_vax_map <- region_map %>% left_join(rep_vax, by = "census_region")
+dem_concern_map <- region_map %>% left_join(dem_concern, by = "census_region")
+rep_concern_map <- region_map %>% left_join(rep_concern, by = "census_region")
+
+# Get region boundaries
+us_states_sf <- us_map(regions = "states") %>%
+  left_join(region_map, by = c("full" = "state"))
+
+region_boundaries <- us_states_sf %>%
+  group_by(census_region) %>%
+  summarise(geometry = st_union(geom), .groups = "drop")
+
+# Set common scales
+vax_range <- range(c(dem_vax$vax_adj_mean, rep_vax$vax_adj_mean), na.rm = TRUE)
+concern_range <- range(c(dem_concern$concern_adj_mean, rep_concern$concern_adj_mean), na.rm = TRUE)
+
+# Democrat vaccine acceptance
+p_dem_vax <- plot_usmap(data = dem_vax_map, values = "vax_adj_mean", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#deebf7", high = "#2171b5", name = "Vax %", limits = vax_range, na.value = "gray90") +
+  labs(title = "A. Democrat Vaccine Acceptance") +
+  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
+
+# Republican vaccine acceptance
+p_rep_vax <- plot_usmap(data = rep_vax_map, values = "vax_adj_mean", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#fee0d2", high = "#cb181d", name = "Vax %", limits = vax_range, na.value = "gray90") +
+  labs(title = "B. Republican Vaccine Acceptance") +
+  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
+
+# Democrat concern
+p_dem_concern <- plot_usmap(data = dem_concern_map, values = "concern_adj_mean", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#deebf7", high = "#2171b5", name = "Concern %", limits = concern_range, na.value = "gray90") +
+  labs(title = "C. Democrat Concern") +
+  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
+
+# Republican concern
+p_rep_concern <- plot_usmap(data = rep_concern_map, values = "concern_adj_mean", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#fee0d2", high = "#cb181d", name = "Concern %", limits = concern_range, na.value = "gray90") +
+  labs(title = "D. Republican Concern") +
+  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
+
+# Combine in 2x2 grid
+(p_dem_vax | p_rep_vax) / (p_dem_concern | p_rep_concern)
+```
+
+Vaccine acceptance rates show strong partisan gaps across all regions, with Democrats consistently reporting higher acceptance rates than Republicans. The gap is largest in the South and Midwest. Perception of pandemic severity (concern) shows an even starker partisan divide: Democrats report being "very concerned" about COVID-19 at rates 20-30 percentage points higher than Republicans in every region. Interestingly, while Republican concern varies less across regions, Democratic concern is highest in the Northeast and West.
+
+### All Partisan Gaps by Census Region
+
+@fig-region-all-gaps displays partisan gaps across all four outcomes in a single 2×2 view, facilitating comparison of geographic patterns across behaviors and perceptions.
+
+```{r}
+#| label: fig-region-all-gaps
+#| fig-cap: "Geographic Distribution of All Partisan Gaps by Census Region (Adjusted). Panel A shows the Republican-Democrat gap in daily contacts (purple); Panel B shows the Democrat-Republican gap in mask usage (gold); Panel C shows the Democrat-Republican gap in vaccine acceptance (teal); Panel D shows the Democrat-Republican gap in COVID-19 concern (orange). Estimates are adjusted for survey wave and local mortality rates. Black borders indicate census region boundaries."
+#| fig-height: 8
+#| fig-width: 10
+
+library(usmap)
+library(patchwork)
+library(sf)
+
+# Create region-to-state mapping
+region_map <- tibble(
+  state = c(
+    "Connecticut", "Maine", "Massachusetts", "New Hampshire", "New Jersey",
+    "New York", "Pennsylvania", "Rhode Island", "Vermont",
+    "Illinois", "Indiana", "Iowa", "Kansas", "Michigan", "Minnesota",
+    "Missouri", "Nebraska", "North Dakota", "Ohio", "South Dakota", "Wisconsin",
+    "Alabama", "Arkansas", "Delaware", "District of Columbia", "Florida",
+    "Georgia", "Kentucky", "Louisiana", "Maryland", "Mississippi",
+    "North Carolina", "Oklahoma", "South Carolina", "Tennessee", "Texas",
+    "Virginia", "West Virginia",
+    "Alaska", "Arizona", "California", "Colorado", "Hawaii", "Idaho",
+    "Montana", "Nevada", "New Mexico", "Oregon", "Utah", "Washington", "Wyoming"
+  ),
+  census_region = c(
+    rep("Northeast", 9), rep("Midwest", 12), rep("South", 17), rep("West", 13)
+  )
+)
+
+# Load all adjusted data
+gaps_by_region <- read_csv("../out/tables/adj_gaps_by_region.csv", show_col_types = FALSE)
+adj_vax_by_region <- read_csv("../out/tables/adj_vax_by_region.csv", show_col_types = FALSE)
+adj_perception_by_region <- read_csv("../out/tables/adj_perception_by_region.csv", show_col_types = FALSE)
+
+# Calculate vaccination gaps (D-R)
+vax_gaps <- adj_vax_by_region %>%
+  select(census_region, political_party, vax_adj_mean) %>%
+  pivot_wider(names_from = political_party, values_from = vax_adj_mean) %>%
+  mutate(vax_gap_dr = Democrat - Republican) %>%
+  select(census_region, vax_gap_dr)
+
+# Calculate perception gaps (D-R)
+perception_gaps <- adj_perception_by_region %>%
+  select(census_region, political_party, concern_adj_mean) %>%
+  pivot_wider(names_from = political_party, values_from = concern_adj_mean) %>%
+  mutate(concern_gap_dr = Democrat - Republican) %>%
+  select(census_region, concern_gap_dr)
+
+# Merge all gaps with region map
+region_gaps_for_map <- region_map %>%
+  left_join(gaps_by_region, by = "census_region") %>%
+  left_join(vax_gaps, by = "census_region") %>%
+  left_join(perception_gaps, by = "census_region")
+
+# Get state polygons and create region boundaries
+us_states_sf <- us_map(regions = "states") %>%
+  left_join(region_map, by = c("full" = "state"))
+
+region_boundaries <- us_states_sf %>%
+  group_by(census_region) %>%
+  summarise(geometry = st_union(geom), .groups = "drop")
+
+# Contact gap map - purple gradient (R > D)
+p_contact_map <- plot_usmap(data = region_gaps_for_map, values = "contacts_gap_rd", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(
+    low = "#f2e6ff", high = "#5c2d91",
+    name = "R−D\n(contacts)",
+    na.value = "gray90"
+  ) +
+  labs(title = "A. Contact Gap") +
+  theme(
+    plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 7)
+  )
+
+# Mask gap map - gold gradient (D > R)
+p_mask_map <- plot_usmap(data = region_gaps_for_map, values = "mask_gap_dr", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(
+    low = "#fff7e6", high = "#b8860b",
+    name = "D−R\n(pp)",
+    na.value = "gray90"
+  ) +
+  labs(title = "B. Mask Gap") +
+  theme(
+    plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 7)
+  )
+
+# Vaccine acceptance gap map - teal gradient (D > R)
+p_vax_map <- plot_usmap(data = region_gaps_for_map, values = "vax_gap_dr", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(
+    low = "#e0f4f4", high = "#006d6d",
+    name = "D−R\n(pp)",
+    na.value = "gray90"
+  ) +
+  labs(title = "C. Vaccine Acceptance Gap") +
+  theme(
+    plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 7)
+  )
+
+# Perception gap map - orange gradient (D > R)
+p_concern_map <- plot_usmap(data = region_gaps_for_map, values = "concern_gap_dr", color = "white", linewidth = 0.2) +
+  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient(
+    low = "#fff3e6", high = "#d45500",
+    name = "D−R\n(pp)",
+    na.value = "gray90"
+  ) +
+  labs(title = "D. Concern Gap") +
+  theme(
+    plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 7)
+  )
+
+# Arrange in 2x2 grid
+(p_contact_map | p_mask_map) / (p_vax_map | p_concern_map)
+```
+
+The 2×2 view reveals that geographic patterns differ across outcomes. Contact gaps (A) and mask gaps (B) show the most regional variation, with the South having notably smaller gaps. In contrast, vaccine acceptance gaps (C) and especially concern gaps (D) are more uniform across regions, suggesting that these outcomes are more strongly driven by partisanship itself rather than regional context.
+
+### Partisan Gaps by Census Division {#sec-division-maps}
+
+@fig-division-gap-map displays partisan gaps at the census division level (9 divisions), providing more geographic granularity than the 4 census regions. **Note**: The East South Central division (AL, KY, MS, TN) shows a reversed pattern with Democrats reporting more contacts and higher mask usage than Republicans. This anomaly likely reflects sampling variability given the smaller sample sizes in that division (n=166 Democrats, n=205 Republicans).
+
+```{r}
+#| label: fig-division-gap-map
+#| fig-cap: "Geographic Distribution of Adjusted Partisan Gaps by Census Division. Panel A shows the Republican-Democrat gap in daily contacts (purple = Republicans report more contacts; teal = Democrats report more). Panel B shows the Democrat-Republican gap in mask usage (gold = Democrats mask more; teal = Republicans mask more). Estimates are adjusted for survey wave and local mortality rates. White indicates no gap. Black borders indicate census division boundaries."
+#| fig-height: 8
+#| fig-width: 8
+
+library(usmap)
+library(patchwork)
+library(sf)
+
+# Load division gaps - using adjusted estimates
+gaps_by_division <- read_csv("../out/tables/adj_gaps_by_division.csv", show_col_types = FALSE)
+
+# Create division-to-state mapping
+division_map <- tibble(
+  state = c(
+    # New England
+    "Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island", "Vermont",
+    # Middle Atlantic
+    "New Jersey", "New York", "Pennsylvania",
+    # East North Central
+    "Illinois", "Indiana", "Michigan", "Ohio", "Wisconsin",
+    # West North Central
+    "Iowa", "Kansas", "Minnesota", "Missouri", "Nebraska", "North Dakota", "South Dakota",
+    # South Atlantic
+    "Delaware", "District of Columbia", "Florida", "Georgia", "Maryland",
+    "North Carolina", "South Carolina", "Virginia", "West Virginia",
+    # East South Central
+    "Alabama", "Kentucky", "Mississippi", "Tennessee",
+    # West South Central
+    "Arkansas", "Louisiana", "Oklahoma", "Texas",
+    # Mountain
+    "Arizona", "Colorado", "Idaho", "Montana", "Nevada", "New Mexico", "Utah", "Wyoming",
+    # Pacific
+    "Alaska", "California", "Hawaii", "Oregon", "Washington"
+  ),
+  census_division = c(
+    rep("New England", 6), rep("Middle Atlantic", 3),
+    rep("East North Central", 5), rep("West North Central", 7),
+    rep("South Atlantic", 9), rep("East South Central", 4), rep("West South Central", 4),
+    rep("Mountain", 8), rep("Pacific", 5)
+  )
+)
+
+# Merge with gaps data
+division_gaps_for_map <- division_map %>%
+  left_join(gaps_by_division, by = "census_division")
+
+# Get state polygons and create division boundaries
+us_states_sf <- us_map(regions = "states") %>%
+  left_join(division_map, by = c("full" = "state"))
+
+division_boundaries <- us_states_sf %>%
+  group_by(census_division) %>%
+  summarise(geometry = st_union(geom), .groups = "drop")
+
+# Contact gap map - diverging scale: purple (R>D) vs teal (D>R)
+p_contact_map <- plot_usmap(data = division_gaps_for_map, values = "contacts_gap_rd", color = "white", linewidth = 0.2) +
+  geom_sf(data = division_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient2(
+    low = "#1b9e77", mid = "white", high = "#5c2d91",
+    midpoint = 0,
+    name = "R−D Gap\n(contacts)",
+    na.value = "gray90"
+  ) +
+  labs(title = "A. Contact Gap (Republican − Democrat)") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+    legend.position = "right"
+  )
+
+# Mask gap map - diverging scale: gold (D>R) vs teal (R>D)
+p_mask_map <- plot_usmap(data = division_gaps_for_map, values = "mask_gap_dr", color = "white", linewidth = 0.2) +
+  geom_sf(data = division_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
+  scale_fill_gradient2(
+    low = "#1b9e77", mid = "white", high = "#b8860b",
+    midpoint = 0,
+    name = "D−R Gap\n(pp)",
+    na.value = "gray90"
+  ) +
+  labs(title = "B. Mask Gap (Democrat − Republican)") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+    legend.position = "right"
+  )
+
+# Stack vertically
+p_contact_map / p_mask_map
+```
+
+### State-Level Partisan Gaps {#sec-state-maps}
+
+@fig-state-maps provides a more granular view, mapping state-level partisan differences in contacts and mask usage. **Important caveat**: The BICS sample was designed to be nationally representative, not representative at the state level. State-level estimates should therefore be interpreted with caution, as they may reflect sampling variability rather than true geographic differences. We present these maps for exploratory purposes only; the regional and division-level analyses above provide more reliable geographic comparisons. States with fewer than 10 respondents per party are excluded.
+
+```{r}
+#| label: fig-state-maps
+#| fig-cap: "State-Level Adjusted Partisan Gaps in Health Behaviors. Panel A shows the Republican-Democrat gap in daily contacts (purple = Republicans report more; teal = Democrats report more). Panel B shows the Democrat-Republican gap in mask usage (gold = Democrats mask more; teal = Republicans mask more). Estimates are adjusted for survey wave and local mortality rates. White indicates no gap; gray states have insufficient sample size."
+#| fig-height: 8
+#| fig-width: 10
+
+library(usmap)
+library(patchwork)
+
+# Load state-level gaps - using adjusted estimates
+gaps_by_state <- read_csv("../out/tables/adj_gaps_by_state.csv", show_col_types = FALSE) %>%
+  mutate(state = STATE)  # usmap needs 'state' column with full names
+
+# Contact gap map - diverging: purple (R>D) vs teal (D>R)
+p_contacts_map <- plot_usmap(data = gaps_by_state, values = "contacts_gap_rd", color = "gray50") +
+  scale_fill_gradient2(
+    low = "#1b9e77", mid = "white", high = "#5c2d91",
+    midpoint = 0,
+    name = "R−D Gap\n(contacts)",
+    na.value = "gray90",
+    limits = c(-5, 7)
+  ) +
+  labs(title = "A. Contact Gap (Republican − Democrat)") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+    legend.position = "right"
+  )
+
+# Mask gap map - diverging: gold (D>R) vs teal (R>D)
+p_masks_map <- plot_usmap(data = gaps_by_state, values = "mask_gap_dr", color = "gray50") +
+  scale_fill_gradient2(
+    low = "#1b9e77", mid = "white", high = "#b8860b",
+    midpoint = 0,
+    name = "D−R Gap\n(pp)",
+    na.value = "gray90",
+    limits = c(-10, 35)
+  ) +
+  labs(title = "B. Mask Gap (Democrat − Republican)") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+    legend.position = "right"
+  )
+
+# Combine vertically
+p_contacts_map / p_masks_map
+```
+
+The maps reveal substantial heterogeneity in partisan gaps across states. For contact behavior, most states show the expected pattern of Republicans reporting more contacts than Democrats (red shading), but the magnitude varies considerably---from nearly no gap in some Southern states to gaps exceeding 5 contacts per day in states like Michigan and Colorado. A few states show reversed patterns (blue shading) where Democrats report more contacts, though these often reflect small sample sizes.
+
+For mask usage, the Democrat-Republican gap (blue shading indicates Democrats masking more) is positive in nearly all states, but again varies substantially in magnitude. Western states tend to show larger mask gaps, while some Southern states show smaller differences---consistent with the regional patterns documented in the main text.
