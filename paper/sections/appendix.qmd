@@ -1015,6 +1015,550 @@ The results clearly demonstrate that partisan differences are not simply artifac
 
 These findings suggest that partisan identity shapes health behaviors above and beyond the effects of local policy. While stricter policies are associated with higher mask usage overall, the Republican-Democrat gap in mask-wearing remains remarkably stable across policy environments. This pattern is consistent with partisanship operating through mechanisms other than policy compliance---such as differential risk perception, social norms within partisan networks, or ideological commitments---that persist regardless of the local regulatory context.
 
+## Robustness to Context and Demographic Controls {#sec-context-demographics-robustness}
+
+This section presents a formal test of whether partisan gaps in health behaviors can be explained by local context (metropolitan status, county mask mandates) or demographic composition (sex, race, age, education). We estimate partisan gaps by census region using three nested models and examine whether gaps shrink toward zero as controls are added.
+
+```{r}
+#| label: fig-region-gap-context-adjustment
+#| fig-cap: "Effect of Controlling for Local Context and Demographics on Regional Partisan Gaps. Top row shows the absolute partisan gap in daily contacts (N = 12,753); bottom row shows the absolute partisan gap in mask usage (N = 9,087). Sample restricted to Democrats and Republicans; mask usage sample is smaller because it is conditional on reporting at least one contact with mask information. Each panel represents a census region. Points show gaps from three nested models: Baseline (wave + mortality), + Context (adds metro status and county mask mandates), and + Demographics (adds sex, race, age, and education). If context or demographics explain partisan gaps, the gaps should shrink toward zero as controls are added."
+#| fig-height: 6
+#| fig-width: 12
+
+library(emmeans)
+library(patchwork)
+library(cowplot)
+
+# Load data
+bics <- read_csv("../data/BICS_ZIP_Features.csv", show_col_types = FALSE)
+
+# Define census regions from STATE
+northeast <- c("Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island",
+               "Vermont", "New Jersey", "New York", "Pennsylvania")
+midwest <- c("Illinois", "Indiana", "Michigan", "Ohio", "Wisconsin",
+             "Iowa", "Kansas", "Minnesota", "Missouri", "Nebraska", "North Dakota", "South Dakota")
+south <- c("Delaware", "Florida", "Georgia", "Maryland", "North Carolina", "South Carolina",
+           "Virginia", "District of Columbia", "West Virginia", "Alabama", "Kentucky",
+           "Mississippi", "Tennessee", "Arkansas", "Louisiana", "Oklahoma", "Texas")
+west <- c("Arizona", "Colorado", "Idaho", "Montana", "Nevada", "New Mexico", "Utah",
+          "Wyoming", "Alaska", "California", "Hawaii", "Oregon", "Washington")
+
+# Add census region to full dataset
+bics <- bics %>%
+  mutate(
+    census_region = case_when(
+      STATE %in% northeast ~ "Northeast",
+      STATE %in% midwest ~ "Midwest",
+      STATE %in% south ~ "South",
+      STATE %in% west ~ "West",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Prepare CONTACTS data (larger sample - doesn't require mask data)
+bics_contacts <- bics %>%
+  filter(!is.na(num_cc), !is.na(census_region), !is.na(political_party),
+         !is.na(log_prev_week_mort_rate), !is.na(Metro), !is.na(wave),
+         !is.na(county_mask_mandate),
+         !is.na(resp_sex), !is.na(r_race), !is.na(age_group), !is.na(resp_educ)) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    wave = factor(wave),
+    political_party = factor(political_party, levels = c("Democrat", "Republican")),
+    census_region = factor(census_region, levels = c("South", "Northeast", "Midwest", "West")),
+    county_mask_mandate = factor(county_mask_mandate)
+  )
+
+# Prepare MASKS data (smaller sample - requires reported contacts with mask info)
+bics_masks <- bics %>%
+  filter(!is.na(Norm_Masks_Used), !is.na(census_region), !is.na(political_party),
+         !is.na(log_prev_week_mort_rate), !is.na(Metro), !is.na(wave),
+         !is.na(county_mask_mandate),
+         !is.na(resp_sex), !is.na(r_race), !is.na(age_group), !is.na(resp_educ)) %>%
+  filter(political_party %in% c("Democrat", "Republican")) %>%
+  mutate(
+    wave = factor(wave),
+    political_party = factor(political_party, levels = c("Democrat", "Republican")),
+    census_region = factor(census_region, levels = c("South", "Northeast", "Midwest", "West")),
+    county_mask_mandate = factor(county_mask_mandate)
+  )
+
+# Fit three nested models for CONTACTS
+contact_m1 <- lm(num_cc ~ political_party * census_region + wave + log_prev_week_mort_rate,
+                 data = bics_contacts, weights = weight_pooled)
+contact_m2 <- lm(num_cc ~ political_party * census_region + wave + log_prev_week_mort_rate +
+                   Metro + county_mask_mandate,
+                 data = bics_contacts, weights = weight_pooled)
+contact_m3 <- lm(num_cc ~ political_party * census_region + wave + log_prev_week_mort_rate +
+                   Metro + county_mask_mandate +
+                   resp_sex + r_race + age_group + resp_educ,
+                 data = bics_contacts, weights = weight_pooled)
+
+# Fit three nested models for MASKS
+mask_m1 <- lm(Norm_Masks_Used ~ political_party * census_region + wave + log_prev_week_mort_rate,
+              data = bics_masks, weights = weight_pooled)
+mask_m2 <- lm(Norm_Masks_Used ~ political_party * census_region + wave + log_prev_week_mort_rate +
+                Metro + county_mask_mandate,
+              data = bics_masks, weights = weight_pooled)
+mask_m3 <- lm(Norm_Masks_Used ~ political_party * census_region + wave + log_prev_week_mort_rate +
+                Metro + county_mask_mandate +
+                resp_sex + r_race + age_group + resp_educ,
+              data = bics_masks, weights = weight_pooled)
+
+# Function to extract partisan gaps with nuisance factors
+get_gaps <- function(model, model_name, nuisance_vars = NULL) {
+  if (is.null(nuisance_vars)) {
+    emm <- emmeans(model, ~ political_party | census_region)
+  } else {
+    emm <- emmeans(model, ~ political_party | census_region, nuisance = nuisance_vars)
+  }
+  contrast(emm, method = "revpairwise") %>%
+    as.data.frame() %>%
+    mutate(model = model_name)
+}
+
+# Extract gaps for all models
+contact_gaps <- bind_rows(
+  get_gaps(contact_m1, "Baseline"),
+  get_gaps(contact_m2, "+ Context", c("wave", "Metro", "county_mask_mandate")),
+  get_gaps(contact_m3, "+ Demographics", c("wave", "Metro", "county_mask_mandate",
+                                            "resp_sex", "r_race", "age_group", "resp_educ"))
+) %>%
+  mutate(
+    model = factor(model, levels = c("Baseline", "+ Context", "+ Demographics")),
+    census_region = factor(census_region, levels = c("South", "Northeast", "Midwest", "West"))
+  )
+
+mask_gaps <- bind_rows(
+  get_gaps(mask_m1, "Baseline"),
+  get_gaps(mask_m2, "+ Context", c("wave", "Metro", "county_mask_mandate")),
+  get_gaps(mask_m3, "+ Demographics", c("wave", "Metro", "county_mask_mandate",
+                                         "resp_sex", "r_race", "age_group", "resp_educ"))
+) %>%
+  mutate(
+    model = factor(model, levels = c("Baseline", "+ Context", "+ Demographics")),
+    census_region = factor(census_region, levels = c("South", "Northeast", "Midwest", "West")),
+    # Flip sign so positive = Democrats mask more
+    estimate_dr = -estimate,
+    lower = -estimate - SE,
+    upper = -estimate + SE
+  )
+
+# Model colors
+model_colors <- c("Baseline" = "#2171b5", "+ Context" = "#d95f02", "+ Demographics" = "#1b9e77")
+
+# Create contact gap plots (one per region) - no x-axis ticks (traced from bottom row)
+contact_plots <- map(levels(contact_gaps$census_region), function(region) {
+  df <- contact_gaps %>% filter(census_region == region)
+  ggplot(df, aes(x = model, y = abs(estimate), color = model)) +
+    geom_point(size = 3.5) +
+    geom_errorbar(aes(ymin = abs(estimate) - SE, ymax = abs(estimate) + SE), width = 0.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    scale_color_manual(values = model_colors, guide = "none") +
+    scale_y_continuous(limits = c(0, 2.5)) +
+    labs(x = NULL, y = if(region == "South") "Partisan Gap\n(contacts)" else NULL,
+         title = region) +
+    theme_cowplot() +
+    theme(
+      plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank()
+    )
+})
+
+# Create mask gap plots (one per region) - with x-axis ticks
+mask_plots <- map(levels(mask_gaps$census_region), function(region) {
+  df <- mask_gaps %>% filter(census_region == region)
+  ggplot(df, aes(x = model, y = abs(estimate_dr), color = model)) +
+    geom_point(size = 3.5) +
+    geom_errorbar(aes(ymin = abs(estimate_dr) - SE, ymax = abs(estimate_dr) + SE), width = 0.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    scale_color_manual(values = model_colors, guide = "none") +
+    scale_y_continuous(limits = c(0, 18)) +
+    labs(x = NULL, y = if(region == "South") "Partisan Gap\n(mask usage)" else NULL,
+         title = NULL) +
+    theme_cowplot() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 11)
+    )
+})
+
+# Combine into 2 rows × 4 columns
+# Add row labels
+contact_row <- wrap_plots(contact_plots, nrow = 1) +
+  plot_annotation(subtitle = "A. Daily Contacts")
+mask_row <- wrap_plots(mask_plots, nrow = 1) +
+  plot_annotation(subtitle = "B. Mask Usage")
+
+contact_row / mask_row
+```
+
+The results show that partisan gaps in both contacts and mask usage remain substantial even after controlling for local context and demographics. For contacts, the gaps are remarkably stable across specifications, suggesting that neither urban-rural differences, policy environments, nor demographic composition can explain partisan behavioral differences. For masks, gaps shrink modestly---particularly in the South---but persist in all regions even in the fully adjusted model, with gaps ranging from approximately 4 percentage points (South) to 12 percentage points (West).
+
+### Partisan Gaps by Congressional District Context {#sec-cd-context-gaps}
+
+@fig-cd-context-gaps presents a complementary view of the main text analysis (@fig-cd-context-emmeans), showing the absolute Republican-Democrat gaps in contacts and mask usage by congressional district partisan context across the three model specifications.
+
+```{r}
+#| label: fig-cd-context-gaps
+#| fig-cap: "Partisan Gaps by Local Partisan Context Across Model Specifications. Left column shows gaps in Democratic-led congressional districts; right column shows gaps in Republican-led districts. Top row shows the absolute partisan gap in daily contacts; bottom row shows the absolute partisan gap in mask usage. Points show gaps from three nested models: Baseline (wave + mortality), + Context (adds metro status and county mask mandates), and + Demographics (adds sex, race, age, and education). Sample restricted to Democrats and Republicans."
+#| fig-height: 6
+#| fig-width: 8
+
+library(emmeans)
+library(patchwork)
+library(cowplot)
+
+# Load data
+bics <- read_csv("../data/BICS_ZIP_Features.csv", show_col_types = FALSE)
+
+# Create party and district variables
+bics_cd <- bics %>%
+  filter(!is.na(political_party_to_CD)) %>%
+  mutate(
+    party = case_when(
+      grepl("^Democrat", political_party_to_CD) ~ "Democrat",
+      grepl("^Republican", political_party_to_CD) ~ "Republican",
+      TRUE ~ NA_character_
+    ),
+    district = case_when(
+      grepl("Democratic led", political_party_to_CD) ~ "Democratic District",
+      grepl("Republican led", political_party_to_CD) ~ "Republican District",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(party), !is.na(district))
+
+# Prepare CONTACTS data
+bics_cd_contacts <- bics_cd %>%
+  filter(!is.na(num_cc), !is.na(log_prev_week_mort_rate), !is.na(Metro), !is.na(wave),
+         !is.na(county_mask_mandate),
+         !is.na(resp_sex), !is.na(r_race), !is.na(age_group), !is.na(resp_educ)) %>%
+  mutate(
+    wave = factor(wave),
+    party = factor(party, levels = c("Democrat", "Republican")),
+    district = factor(district, levels = c("Democratic District", "Republican District")),
+    county_mask_mandate = factor(county_mask_mandate)
+  )
+
+# Prepare MASKS data
+bics_cd_masks <- bics_cd %>%
+  filter(!is.na(Norm_Masks_Used), !is.na(log_prev_week_mort_rate), !is.na(Metro), !is.na(wave),
+         !is.na(county_mask_mandate),
+         !is.na(resp_sex), !is.na(r_race), !is.na(age_group), !is.na(resp_educ)) %>%
+  mutate(
+    wave = factor(wave),
+    party = factor(party, levels = c("Democrat", "Republican")),
+    district = factor(district, levels = c("Democratic District", "Republican District")),
+    county_mask_mandate = factor(county_mask_mandate)
+  )
+
+# Fit three nested models for CONTACTS
+contact_m1 <- lm(num_cc ~ party * district + wave + log_prev_week_mort_rate,
+                 data = bics_cd_contacts, weights = weight_pooled)
+contact_m2 <- lm(num_cc ~ party * district + wave + log_prev_week_mort_rate +
+                   Metro + county_mask_mandate,
+                 data = bics_cd_contacts, weights = weight_pooled)
+contact_m3 <- lm(num_cc ~ party * district + wave + log_prev_week_mort_rate +
+                   Metro + county_mask_mandate +
+                   resp_sex + r_race + age_group + resp_educ,
+                 data = bics_cd_contacts, weights = weight_pooled)
+
+# Fit three nested models for MASKS
+mask_m1 <- lm(Norm_Masks_Used ~ party * district + wave + log_prev_week_mort_rate,
+              data = bics_cd_masks, weights = weight_pooled)
+mask_m2 <- lm(Norm_Masks_Used ~ party * district + wave + log_prev_week_mort_rate +
+                Metro + county_mask_mandate,
+              data = bics_cd_masks, weights = weight_pooled)
+mask_m3 <- lm(Norm_Masks_Used ~ party * district + wave + log_prev_week_mort_rate +
+                Metro + county_mask_mandate +
+                resp_sex + r_race + age_group + resp_educ,
+              data = bics_cd_masks, weights = weight_pooled)
+
+# Function to extract partisan gaps by district
+get_gaps_by_district <- function(model, model_name, nuisance_vars = NULL) {
+  if (is.null(nuisance_vars)) {
+    emm <- emmeans(model, ~ party | district)
+  } else {
+    emm <- emmeans(model, ~ party | district, nuisance = nuisance_vars)
+  }
+  contrast(emm, method = "revpairwise") %>%
+    as.data.frame() %>%
+    mutate(model = model_name)
+}
+
+# Extract gaps for all models
+contact_gaps <- bind_rows(
+  get_gaps_by_district(contact_m1, "Baseline"),
+  get_gaps_by_district(contact_m2, "+ Context", c("wave", "Metro", "county_mask_mandate")),
+  get_gaps_by_district(contact_m3, "+ Demographics", c("wave", "Metro", "county_mask_mandate",
+                                                        "resp_sex", "r_race", "age_group", "resp_educ"))
+) %>%
+  mutate(
+    model = factor(model, levels = c("Baseline", "+ Context", "+ Demographics")),
+    district = factor(district, levels = c("Democratic District", "Republican District"))
+  )
+
+mask_gaps <- bind_rows(
+  get_gaps_by_district(mask_m1, "Baseline"),
+  get_gaps_by_district(mask_m2, "+ Context", c("wave", "Metro", "county_mask_mandate")),
+  get_gaps_by_district(mask_m3, "+ Demographics", c("wave", "Metro", "county_mask_mandate",
+                                                     "resp_sex", "r_race", "age_group", "resp_educ"))
+) %>%
+  mutate(
+    model = factor(model, levels = c("Baseline", "+ Context", "+ Demographics")),
+    district = factor(district, levels = c("Democratic District", "Republican District")),
+    estimate_dr = -estimate,
+    lower = -estimate - SE,
+    upper = -estimate + SE
+  )
+
+# Model colors
+model_colors <- c("Baseline" = "#2171b5", "+ Context" = "#d95f02", "+ Demographics" = "#1b9e77")
+
+# Create contact gap plots by district - no x-axis ticks
+contact_plots <- map(levels(contact_gaps$district), function(dist) {
+  df <- contact_gaps %>% filter(district == dist)
+  ggplot(df, aes(x = model, y = abs(estimate), color = model)) +
+    geom_point(size = 3.5) +
+    geom_errorbar(aes(ymin = abs(estimate) - SE, ymax = abs(estimate) + SE), width = 0.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    scale_color_manual(values = model_colors, guide = "none") +
+    scale_y_continuous(limits = c(0, 3)) +
+    labs(x = NULL, y = if(dist == "Democratic District") "Partisan Gap\n(contacts)" else NULL,
+         title = dist) +
+    theme_cowplot() +
+    theme(
+      plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank()
+    )
+})
+
+# Create mask gap plots by district - with x-axis ticks
+mask_plots <- map(levels(mask_gaps$district), function(dist) {
+  df <- mask_gaps %>% filter(district == dist)
+  ggplot(df, aes(x = model, y = abs(estimate_dr), color = model)) +
+    geom_point(size = 3.5) +
+    geom_errorbar(aes(ymin = abs(estimate_dr) - SE, ymax = abs(estimate_dr) + SE), width = 0.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    scale_color_manual(values = model_colors, guide = "none") +
+    scale_y_continuous(limits = c(0, 18)) +
+    labs(x = NULL, y = if(dist == "Democratic District") "Partisan Gap\n(mask usage)" else NULL,
+         title = NULL) +
+    theme_cowplot() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 11)
+    )
+})
+
+# Combine: rows = behavior, columns = district context
+contact_row <- wrap_plots(contact_plots, nrow = 1)
+mask_row <- wrap_plots(mask_plots, nrow = 1)
+
+contact_row / mask_row
+```
+
+The gaps remain stable across model specifications in both district contexts. In Democratic-led districts, the contact gap ranges from 1.4-1.6 contacts across specifications; in Republican-led districts, it ranges from 0.5-0.7 contacts. For masks, gaps in Democratic districts range from 7-8 percentage points, while gaps in Republican districts range from 6-8 percentage points. These results complement the main text finding that partisan gaps persist regardless of local partisan context.
+
+### Robustness to Model Specification {#sec-cd-context-robustness}
+
+@fig-cd-context-robustness demonstrates that partisan gaps in health behaviors persist regardless of whether we control for local context and demographic characteristics. The figure compares unadjusted estimates (wave only) with adjusted estimates (controlling for incidence, mask mandates, metro status, and demographics).
+
+```{r}
+#| label: fig-cd-context-robustness
+#| fig-cap: "Robustness of Partisan Gaps to Model Specification. Panels A-B show predicted daily contacts; Panels C-D show predicted mask usage. Left column shows Democratic-led districts; right column shows Republican-led districts. Open circles show unadjusted estimates (wave only); filled circles show adjusted estimates (controlling for incidence, mask mandates, metro status, demographics). Partisan gaps persist regardless of model specification."
+#| fig-height: 6
+#| fig-width: 9
+
+library(emmeans)
+library(patchwork)
+library(cowplot)
+
+# Load data
+bics <- read_csv("../data/BICS_ZIP_Features.csv", show_col_types = FALSE)
+
+# Filter to valid CD data (Democrats and Republicans only for cleaner comparison)
+filtered_df <- bics %>%
+  filter(!is.na(political_party) & !is.na(CONGRESSPERSON_PARTY) &
+         political_party %in% c("Democrat", "Republican"))
+
+# Define factor levels for CD context
+cd_levels <- c("Democrat in Democratic led CD",
+               "Democrat in Republican led CD",
+               "Republican in Democratic led CD",
+               "Republican in Republican led CD")
+
+# =============================================================================
+# CONTACTS
+# =============================================================================
+
+# Adjusted model
+cd_contact_model <- lm(num_cc ~ log_prev_week_inc_rate + county_mask_mandate + Metro +
+                         male + resp_educ + resp_yob + resp_hhsize + r_race + r_working +
+                         wave + political_party_to_CD,
+                       data = filtered_df,
+                       weights = weight_pooled)
+
+emm_contact_adj <- emmeans(cd_contact_model, specs = "political_party_to_CD",
+                           nuisance = c("log_prev_week_inc_rate", "county_mask_mandate", "Metro",
+                                        "male", "resp_educ", "resp_yob", "resp_hhsize", "r_race",
+                                        "r_working", "wave"))
+emm_contact_adj <- as.data.frame(summary(emm_contact_adj)) %>%
+  filter(political_party_to_CD %in% cd_levels) %>%
+  mutate(controls = "Adjusted")
+
+# Unadjusted model (wave only)
+cd_contact_model_raw <- lm(num_cc ~ wave + political_party_to_CD,
+                           data = filtered_df,
+                           weights = weight_pooled)
+emm_contact_raw <- emmeans(cd_contact_model_raw, specs = "political_party_to_CD",
+                           nuisance = "wave")
+emm_contact_raw <- as.data.frame(summary(emm_contact_raw)) %>%
+  filter(political_party_to_CD %in% cd_levels) %>%
+  mutate(controls = "Unadjusted")
+
+all_contact_emms <- rbind(emm_contact_adj, emm_contact_raw)
+
+# =============================================================================
+# MASKS
+# =============================================================================
+
+# Adjusted model
+cd_mask_model <- lm(Norm_Masks_Used ~ log_prev_week_inc_rate + county_mask_mandate + Metro +
+                      male + resp_educ + resp_yob + resp_hhsize + r_race + r_working +
+                      wave + political_party_to_CD,
+                    data = filtered_df,
+                    weights = weight_pooled)
+
+emm_mask_adj <- emmeans(cd_mask_model, specs = "political_party_to_CD",
+                        nuisance = c("log_prev_week_inc_rate", "county_mask_mandate", "Metro",
+                                     "male", "resp_educ", "resp_yob", "resp_hhsize", "r_race",
+                                     "r_working", "wave"))
+emm_mask_adj <- as.data.frame(summary(emm_mask_adj)) %>%
+  filter(political_party_to_CD %in% cd_levels) %>%
+  mutate(controls = "Adjusted")
+
+# Unadjusted model (wave only)
+cd_mask_model_raw <- lm(Norm_Masks_Used ~ wave + political_party_to_CD,
+                        data = filtered_df,
+                        weights = weight_pooled)
+emm_mask_raw <- emmeans(cd_mask_model_raw, specs = "political_party_to_CD",
+                        nuisance = "wave")
+emm_mask_raw <- as.data.frame(summary(emm_mask_raw)) %>%
+  filter(political_party_to_CD %in% cd_levels) %>%
+  mutate(controls = "Unadjusted")
+
+all_mask_emms <- rbind(emm_mask_adj, emm_mask_raw)
+
+# =============================================================================
+# PLOTS - 2x2 layout with individual subplot labels
+# =============================================================================
+
+# Parse party and district context
+parse_cd_data <- function(df) {
+  df %>%
+    mutate(
+      party = case_when(
+        grepl("^Democrat", political_party_to_CD) ~ "Democrat",
+        grepl("^Republican", political_party_to_CD) ~ "Republican"
+      ),
+      district_context = case_when(
+        grepl("Democratic led CD", political_party_to_CD) ~ "Democratic District",
+        grepl("Republican led CD", political_party_to_CD) ~ "Republican District"
+      ),
+      party = factor(party, levels = c("Democrat", "Republican")),
+      district_context = factor(district_context, levels = c("Democratic District", "Republican District"))
+    )
+}
+
+all_contact_emms <- parse_cd_data(all_contact_emms)
+all_mask_emms <- parse_cd_data(all_mask_emms)
+
+# Party colors
+party_colors <- c("Democrat" = "#2166AC", "Republican" = "#B2182B")
+
+# Fixed y-axis limits for comparability (same as main figure)
+contacts_ylim <- c(4, 7.5)
+masks_ylim <- c(40, 80)
+
+# Common theme with subtle horizontal gridlines
+theme_grid <- theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    axis.text.x = element_text(size = 10),
+    panel.grid.major.y = element_line(color = "gray85", linewidth = 0.3)
+  )
+
+# A: Contacts in Democratic District
+p_a <- ggplot(all_contact_emms %>% filter(district_context == "Democratic District"),
+              aes(x = party, y = emmean, color = party,
+                  group = interaction(party, controls))) +
+  geom_point(aes(shape = controls), size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.4)) +
+  scale_color_manual(values = party_colors, guide = "none") +
+  scale_shape_manual(name = NULL, values = c("Unadjusted" = 1, "Adjusted" = 16)) +
+  scale_y_continuous(limits = contacts_ylim) +
+  labs(x = NULL, y = "Predicted Daily Contacts", title = "A. Daily Contacts") +
+  theme_grid +
+  theme(legend.position = "top")
+
+# B: Contacts in Republican District
+p_b <- ggplot(all_contact_emms %>% filter(district_context == "Republican District"),
+              aes(x = party, y = emmean, color = party,
+                  group = interaction(party, controls))) +
+  geom_point(aes(shape = controls), size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.4)) +
+  scale_color_manual(values = party_colors, guide = "none") +
+  scale_shape_manual(name = NULL, values = c("Unadjusted" = 1, "Adjusted" = 16)) +
+  scale_y_continuous(limits = contacts_ylim) +
+  labs(x = NULL, y = NULL, title = "B. Daily Contacts") +
+  theme_grid +
+  theme(legend.position = "top")
+
+# C: Masks in Democratic District
+p_c <- ggplot(all_mask_emms %>% filter(district_context == "Democratic District"),
+              aes(x = party, y = emmean, color = party,
+                  group = interaction(party, controls))) +
+  geom_point(aes(shape = controls), size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.4)) +
+  scale_color_manual(values = party_colors, guide = "none") +
+  scale_shape_manual(name = NULL, values = c("Unadjusted" = 1, "Adjusted" = 16)) +
+  scale_y_continuous(limits = masks_ylim) +
+  labs(x = NULL, y = "Predicted Mask Usage (%)", title = "C. Mask Usage") +
+  theme_grid +
+  theme(legend.position = "none")
+
+# D: Masks in Republican District
+p_d <- ggplot(all_mask_emms %>% filter(district_context == "Republican District"),
+              aes(x = party, y = emmean, color = party,
+                  group = interaction(party, controls))) +
+  geom_point(aes(shape = controls), size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.4)) +
+  scale_color_manual(values = party_colors, guide = "none") +
+  scale_shape_manual(name = NULL, values = c("Unadjusted" = 1, "Adjusted" = 16)) +
+  scale_y_continuous(limits = masks_ylim) +
+  labs(x = NULL, y = NULL, title = "D. Mask Usage") +
+  theme_grid +
+  theme(legend.position = "none")
+
+# Create column header labels
+header_dem <- wrap_elements(grid::textGrob("Democratic District",
+                                            gp = grid::gpar(fontsize = 14, fontface = "bold")))
+header_rep <- wrap_elements(grid::textGrob("Republican District",
+                                            gp = grid::gpar(fontsize = 14, fontface = "bold")))
+
+# Combine: header row + contacts row + masks row
+(header_dem | header_rep) / (p_a | p_b) / (p_c | p_d) +
+  plot_layout(heights = c(0.08, 1, 1))
+```
+
+The adjustment for context and demographics has minimal impact on partisan gaps. For contacts, the Republican-Democrat gap shifts only slightly when adding controls: in Democratic districts, the gap remains approximately 1.3-1.5 contacts whether unadjusted or adjusted; in Republican districts, the gap remains approximately 0.5-0.8 contacts. For masks, the Democratic advantage over Republicans remains stable at approximately 7-10 percentage points across both district contexts and model specifications. This stability indicates that partisan differences in health behaviors are not explained by compositional differences or local contextual factors.
+
 ## Weight Sensitivity Analysis {#sec-weight-sensitivity}
 
 ```{r}
@@ -1893,31 +2437,51 @@ A potential confounder for geographic patterns in partisan gaps is that metropol
 
 ```{r}
 #| label: fig-policy-behaviors
-#| fig-cap: "Health Behaviors by Party and Policy Environment. Each panel shows behavior levels for the three partisan groups within areas with no mask mandate, less strict mandates, or strict mandates. Panel A shows daily contacts, Panel B shows mask usage. Partisan gaps persist within each policy environment."
-#| fig-height: 4
+#| fig-cap: "Health Behaviors by Party and Policy Environment. Left column shows behavior by county mask mandate policy (no mandate, less strict, strict). Right column shows behavior by respondent-reported stay-in-place order status (waves 1-5 only; this question was not assessed in wave 6). Top row shows daily contacts; bottom row shows mask usage. Partisan gaps persist within each policy environment."
+#| fig-height: 7
 #| fig-width: 10
 
 library(cowplot)
 library(patchwork)
 
-# Load policy behavior data
+# Load policy behavior data for mask mandates
 behaviors_by_policy <- read_csv("../out/tables/behaviors_by_policy.csv", show_col_types = FALSE) %>%
   mutate(
     political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
     policy = factor(policy, levels = c("No Mandate", "Less Strict", "Strict"))
   )
 
+# Load raw data to compute stay-in-place behaviors
+bics <- read_csv("../data/BICS_ZIP_Features.csv", show_col_types = FALSE)
+
+# Compute behaviors by stay-in-place policy (waves 1-5 only, wave 6 has all NA)
+behaviors_by_sip <- bics %>%
+  filter(!is.na(policy_sip), policy_sip %in% c("Yes", "No"),
+         political_party %in% c("Democrat", "Independent", "Republican")) %>%
+  group_by(policy_sip, political_party) %>%
+  summarise(
+    contacts_mean = weighted.mean(num_cc, weight_pooled, na.rm = TRUE),
+    contacts_se = sqrt(Hmisc::wtd.var(num_cc, weight_pooled, na.rm = TRUE)) / sqrt(n()),
+    mask_mean = weighted.mean(Norm_Masks_Used, weight_pooled, na.rm = TRUE),
+    mask_se = sqrt(Hmisc::wtd.var(Norm_Masks_Used, weight_pooled, na.rm = TRUE)) / sqrt(sum(!is.na(Norm_Masks_Used))),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+    policy_sip = factor(policy_sip, levels = c("No", "Yes"), labels = c("No SIP Order", "SIP Order"))
+  )
+
 # Party colors
 party_colors <- c("Democrat" = "#326ba4", "Independent" = "#6db753", "Republican" = "#c50000")
 
-# Contacts plot
-p_contacts_policy <- ggplot(behaviors_by_policy, aes(x = policy, y = contacts_mean, fill = political_party)) +
+# A. Contacts by mask mandate
+p_contacts_mandate <- ggplot(behaviors_by_policy, aes(x = policy, y = contacts_mean, fill = political_party)) +
   geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black", alpha = 0.8) +
   geom_errorbar(aes(ymin = contacts_mean - contacts_se, ymax = contacts_mean + contacts_se),
                 position = position_dodge(width = 0.8), width = 0.2) +
   scale_fill_manual(values = party_colors) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
-  labs(x = "Mask Mandate Policy", y = "Daily Contacts", title = "A. Contacts", fill = "Party") +
+  labs(x = NULL, y = "Daily Contacts", title = "A. Contacts by Mask Mandate", fill = "Party") +
   theme_cowplot() +
   theme(
     plot.title = element_text(face = "bold", size = 11),
@@ -1925,23 +2489,54 @@ p_contacts_policy <- ggplot(behaviors_by_policy, aes(x = policy, y = contacts_me
     axis.text.x = element_text(size = 9)
   )
 
-# Masks plot
-p_masks_policy <- ggplot(behaviors_by_policy, aes(x = policy, y = mask_mean, fill = political_party)) +
+# B. Contacts by stay-in-place
+p_contacts_sip <- ggplot(behaviors_by_sip, aes(x = policy_sip, y = contacts_mean, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black", alpha = 0.8) +
+  geom_errorbar(aes(ymin = contacts_mean - contacts_se, ymax = contacts_mean + contacts_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(x = NULL, y = NULL, title = "B. Contacts by Stay-in-Place Order", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    legend.position = "none",
+    axis.text.x = element_text(size = 9)
+  )
+
+# C. Masks by mask mandate
+p_masks_mandate <- ggplot(behaviors_by_policy, aes(x = policy, y = mask_mean, fill = political_party)) +
   geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black", alpha = 0.8) +
   geom_errorbar(aes(ymin = mask_mean - mask_se, ymax = mask_mean + mask_se),
                 position = position_dodge(width = 0.8), width = 0.2) +
   scale_fill_manual(values = party_colors) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 85)) +
-  labs(x = "Mask Mandate Policy", y = "Mask Usage (%)", title = "B. Mask Usage", fill = "Party") +
+  labs(x = NULL, y = "Mask Usage (%)", title = "C. Mask Usage by Mask Mandate", fill = "Party") +
   theme_cowplot() +
   theme(
     plot.title = element_text(face = "bold", size = 11),
-    legend.position = "bottom",
+    legend.position = "none",
     axis.text.x = element_text(size = 9)
   )
 
-# Combine
-p_contacts_policy + p_masks_policy
+# D. Masks by stay-in-place
+p_masks_sip <- ggplot(behaviors_by_sip, aes(x = policy_sip, y = mask_mean, fill = political_party)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, color = "black", alpha = 0.8) +
+  geom_errorbar(aes(ymin = mask_mean - mask_se, ymax = mask_mean + mask_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 85)) +
+  labs(x = NULL, y = NULL, title = "D. Mask Usage by Stay-in-Place Order", fill = "Party") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 11),
+    legend.position = "none",
+    axis.text.x = element_text(size = 9)
+  )
+
+# Combine in 2x2 grid: rows = behavior, columns = policy type
+(p_contacts_mandate + p_contacts_sip) / (p_masks_mandate + p_masks_sip) +
+  plot_layout(guides = "collect") & theme(legend.position = "bottom")
 ```
 
 ### Behavior by Local Partisan Context {#sec-partisan-context}
@@ -2166,98 +2761,6 @@ p_contacts + p_masks + plot_layout(guides = "collect") &
 
 The figure reveals that the smaller partisan gaps in the South are driven primarily by Republicans in that region reporting fewer contacts and higher mask usage than Republicans elsewhere, rather than by Democrats in the South behaving differently. This suggests that regional norms may exert a moderating influence on Republican behavior specifically.
 
-### Regional Behavior Maps by Party
-
-@fig-region-levels-map displays the underlying behavior levels by party and region in map form, complementing the gap maps in the main text. This 2×2 layout shows contacts (top row) and mask usage (bottom row) for Democrats (left) and Republicans (right).
-
-```{r}
-#| label: fig-region-levels-map
-#| fig-cap: "Adjusted Health Behavior Levels by Party Across Census Regions. Top row shows mean daily contacts for Democrats (A) and Republicans (B). Bottom row shows mask usage for Democrats (C) and Republicans (D). Estimates are adjusted for survey wave and local mortality rates. Darker shading indicates higher values. Black borders indicate census region boundaries."
-#| fig-height: 8
-#| fig-width: 10
-
-library(usmap)
-library(patchwork)
-library(sf)
-
-# Create region-to-state mapping
-region_map <- tibble(
-  state = c(
-    "Connecticut", "Maine", "Massachusetts", "New Hampshire", "New Jersey",
-    "New York", "Pennsylvania", "Rhode Island", "Vermont",
-    "Illinois", "Indiana", "Iowa", "Kansas", "Michigan", "Minnesota",
-    "Missouri", "Nebraska", "North Dakota", "Ohio", "South Dakota", "Wisconsin",
-    "Alabama", "Arkansas", "Delaware", "District of Columbia", "Florida",
-    "Georgia", "Kentucky", "Louisiana", "Maryland", "Mississippi",
-    "North Carolina", "Oklahoma", "South Carolina", "Tennessee", "Texas",
-    "Virginia", "West Virginia",
-    "Alaska", "Arizona", "California", "Colorado", "Hawaii", "Idaho",
-    "Montana", "Nevada", "New Mexico", "Oregon", "Utah", "Washington", "Wyoming"
-  ),
-  census_region = c(
-    rep("Northeast", 9), rep("Midwest", 12), rep("South", 17), rep("West", 13)
-  )
-)
-
-# Reshape behaviors data for mapping
-dem_data <- behaviors_by_region %>%
-  filter(political_party == "Democrat") %>%
-  select(census_region, contacts_adj_mean, mask_adj_mean) %>%
-  rename(contacts_mean = contacts_adj_mean, mask_mean = mask_adj_mean)
-
-rep_data <- behaviors_by_region %>%
-  filter(political_party == "Republican") %>%
-  select(census_region, contacts_adj_mean, mask_adj_mean) %>%
-  rename(contacts_mean = contacts_adj_mean, mask_mean = mask_adj_mean)
-
-dem_for_map <- region_map %>% left_join(dem_data, by = "census_region")
-rep_for_map <- region_map %>% left_join(rep_data, by = "census_region")
-
-# Get region boundaries
-us_states_sf <- us_map(regions = "states") %>%
-  left_join(region_map, by = c("full" = "state"))
-
-region_boundaries <- us_states_sf %>%
-  group_by(census_region) %>%
-  summarise(geometry = st_union(geom), .groups = "drop")
-
-# Set common scales
-contacts_range <- range(c(dem_data$contacts_mean, rep_data$contacts_mean), na.rm = TRUE)
-mask_range <- range(c(dem_data$mask_mean, rep_data$mask_mean), na.rm = TRUE)
-
-# Democrat contacts
-p_dem_contacts <- plot_usmap(data = dem_for_map, values = "contacts_mean", color = "white", linewidth = 0.2) +
-  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
-  scale_fill_gradient(low = "#deebf7", high = "#2171b5", name = "Contacts", limits = contacts_range, na.value = "gray90") +
-  labs(title = "A. Democrat Contacts") +
-  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
-
-# Republican contacts
-p_rep_contacts <- plot_usmap(data = rep_for_map, values = "contacts_mean", color = "white", linewidth = 0.2) +
-  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
-  scale_fill_gradient(low = "#fee0d2", high = "#cb181d", name = "Contacts", limits = contacts_range, na.value = "gray90") +
-  labs(title = "B. Republican Contacts") +
-  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
-
-# Democrat masks
-p_dem_masks <- plot_usmap(data = dem_for_map, values = "mask_mean", color = "white", linewidth = 0.2) +
-  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
-  scale_fill_gradient(low = "#deebf7", high = "#2171b5", name = "Mask %", limits = mask_range, na.value = "gray90") +
-  labs(title = "C. Democrat Mask Usage") +
-  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
-
-# Republican masks
-p_rep_masks <- plot_usmap(data = rep_for_map, values = "mask_mean", color = "white", linewidth = 0.2) +
-  geom_sf(data = region_boundaries, fill = NA, color = "black", linewidth = 0.6, inherit.aes = FALSE) +
-  scale_fill_gradient(low = "#fee0d2", high = "#cb181d", name = "Mask %", limits = mask_range, na.value = "gray90") +
-  labs(title = "D. Republican Mask Usage") +
-  theme(plot.title = element_text(face = "bold", size = 11, hjust = 0.5), legend.position = "right")
-
-# Combine in 2x2 grid
-(p_dem_contacts | p_rep_contacts) / (p_dem_masks | p_rep_masks)
-```
-
-The maps confirm that the smaller partisan gaps in the South reflect Republicans in that region behaving more like Democrats elsewhere---with fewer contacts and higher mask usage than Republicans in other regions---rather than Southern Democrats behaving unusually.
 
 ### Regional Vaccine Acceptance and Perception Maps by Party
 
