@@ -83,8 +83,10 @@ As visible in the sample sizes, our analytic sample of 18,233 respondents overre
 ### Health Behaviors
 
 **Social Contacts.**
+Our primary contact measure is the total number of face-to-face contacts respondents reported for the day prior to the survey interview (`num_cc`). BICS defined a contact as any in-person interaction involving either physical touch or a conversation of at least a few words. We also examine non-household contacts (`num_cc_nonhh`) as a supplementary measure that isolates discretionary social exposure outside the home, where respondents have greater behavioral latitude.
 
 **Mask-Wearing.**
+Mask usage is derived from the contact-level alter roster. BICS collected detailed information on up to three non-household contacts per respondent; for each of these contacts, respondents indicated which protective behaviors—if any—were used during that interaction, including wearing a face mask. We aggregate these reports to construct a respondent-level measure equal to the percentage of recalled non-household contacts during which the respondent wore a mask (0–100 scale). Because this measure is based on a subset of up to three contacts rather than all contacts reported, it should be interpreted as reflecting mask behavior during a representative sample of a respondent's non-household interactions. This measure captures actual masking behavior during specific interactions rather than general self-reported attitudes toward masks, and is therefore less susceptible to social desirability bias on abstract attitudinal items.
 
 **Vaccination.**
 Vaccine acceptance was measured in Wave 6 (May 2021) only, when the survey asked respondents whether they had received a COVID-19 vaccine or intended to get one.
@@ -100,8 +102,10 @@ We measure political affiliation using respondents' self-reported party identifi
 We link individual survey responses to geographic data at the ZIP code and congressional district levels. This allows us to characterize the local partisan environment and policy context in which respondents were living.
 
 **Partisan Composition.**
+We characterize the local partisan environment using congressional district-level vote share from the 2020 U.S. House elections. Each respondent is linked to their congressional district via ZIP code, and we record the Democratic and Republican two-party vote share in that district. We use these vote shares continuously in some models and in quartile-based categories in others. We also construct a binary indicator (`In_Opposing_Party_CD`) equal to one if the respondent's stated party identification differs from the party of their congressional district's representative, allowing us to examine whether partisan behavioral gaps persist when Democrats and Republicans are embedded in opposing-party political environments.
 
 **Policy Environment.**
+We characterize local policy context using county-level mask mandate status, derived from a county-level dataset of public health orders. Mandates are classified into four categories: strict (required in all or most public places), less strict (required in indoor commercial settings or for employees), unspecified or unclear, and no mandate. This classification allows us to test whether partisan differences in health behaviors persist within comparable policy environments, which would indicate that individual partisan identity rather than top-down policy drives behavior. Importantly, this measure captures whether a county had a mandate in place at all rather than the precise timing or duration of mandates; we are therefore unable to assess whether behavioral differences narrowed immediately following mandate adoption or eroded over time as mandates persisted.
 
 ### Control Variables
 

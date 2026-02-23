@@ -731,7 +731,7 @@ ggplot(interaction_all, aes(x = term_label, y = estimate, color = outcome)) +
 
 **Wave FE Model (National/Temporal Patterns):**
 For contacts, the baseline Republican-Democrat gap is `r sprintf("%.2f", contact_int_baseline)` contacts per day.
-The concern interaction is small and not statistically significant ($\beta$ = `r sprintf("%.2f", contact_int_concern)`, p = `r sprintf("%.2f", contact_int_concern_p)`), confirming that stated concern does not moderate the contact gap.
+The concern interaction is statistically significant and negative ($\beta$ = `r sprintf("%.2f", contact_int_concern)`, p = `r sprintf("%.2f", contact_int_concern_p)`), indicating that stated concern does modestly narrow the partisan contact gap.
 The mortality interaction is negative ($\beta$ = `r sprintf("%.2f", contact_int_mort)`, p = `r sprintf("%.3f", contact_int_mort_p)`): during high-mortality waves, the partisan gap narrows.
 
 For masks, the baseline gap is `r sprintf("%.1f", abs(mask_int_baseline))` percentage points.

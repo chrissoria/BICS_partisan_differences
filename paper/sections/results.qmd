@@ -185,12 +185,12 @@ Among the very concerned, Republicans still reported `r sprintf("%.1f", contacts
 For mask usage, however, perceived severity does appear to mitigate polarization: the partisan gap narrows as concern increases, and among the "very concerned," Republicans and Democrats report nearly identical mask usage (`r sprintf("%.0f", mask_vc_rep)`% vs. `r sprintf("%.0f", mask_vc_dem)`%).
 
 Interaction models formally test whether concern moderates the partisan gap (see @sec-interaction-models in the Appendix).
-For contacts, the Republican × Very Concerned interaction is not significant (β = `r sprintf("%.2f", contact_int_concern)`, p = `r sprintf("%.2f", contact_int_concern_p)`), confirming that concern does not reduce partisan polarization in contact behavior.
+For contacts, the Republican × Very Concerned interaction is statistically significant and negative (β = `r sprintf("%.2f", contact_int_concern)`, p = `r sprintf("%.2f", contact_int_concern_p)`), indicating that concern does modestly narrow the partisan contact gap.
 For masks, the interaction is large and significant (β = `r sprintf("%.1f", mask_int_concern)`, p \< 0.001).
 The mechanism is clear: among the very concerned, Republicans wore masks during `r sprintf("%.0f", mask_veryconcerned_rep)`% of contacts, nearly identical to Democrats (`r sprintf("%.0f", mask_veryconcerned_dem)`%).
 But this convergence reflects Republicans responding more sharply to concern: Republicans increased mask usage by `r sprintf("%.0f", mask_slope_rep)` percentage points from "not at all concerned" to "very concerned," compared to `r sprintf("%.0f", mask_slope_dem)` percentage points for Democrats.
 Higher perceived severity narrows the mask gap primarily because Republicans increase their masking at a steeper rate.
-In sum, perceived severity mitigates partisan polarization for mask usage but not for social contacts.
+In sum, perceived severity mitigates partisan polarization for both behaviors, though the effect is substantially larger for mask usage than for social contacts.
 
 ### How Polarization Evolved Over Time
 

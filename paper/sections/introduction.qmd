@@ -256,34 +256,10 @@ Moreover, understanding heterogeneity in contact patterns across subpopulations 
 Our approach is to examine whether partisan differences in health behavior persist across a range of contextual conditions, using patterns of variation to adjudicate between competing theoretical explanations.
 Although we cannot directly test causal mechanisms, we can ask: which theories survive contact with the empirical patterns?
 
-Several theoretical perspectives generate distinct predictions about how partisan gaps should vary across contexts.
-If partisan differences are primarily artifacts of policy environments, gaps should disappear when we compare partisans living under similar policies—within strict mandate areas, within lenient areas, and within areas with no mandates.
-If partisan differences reflect demographic composition, controlling for age, education, urbanicity, and other covariates should eliminate the gaps.
-If local social conformity shapes behavior, we should observe individuals shifting toward the norms of their local community regardless of their own partisan identity—Democrats in Republican areas behaving more like Republicans, and vice versa.
-If cross-cutting social contexts reduce polarization, partisan gaps should be smaller when partisans live among members of the opposing party than when they live among co-partisans.
-
-A key question is whether local context fully determines behavior or whether partisan identity exerts an independent effect.
-If context dominates, partisans in the same environment should behave similarly—a Democrat in a Republican-majority area should be nearly indistinguishable from their Republican neighbors.
-If partisan identity dominates, gaps should persist even within shared contexts: Democrats and Republicans living in the same types of areas should still behave differently from one another, even if both groups shift their behavior in response to local conditions.
-The persistence of partisan gaps across multiple contextual dimensions—partisan composition, urbanicity, region, and policy environment—would provide strong evidence that partisan identity drives health behavior independent of local culture.
-It would also suggest that behavioral polarization is "portable": people carry their partisan patterns with them regardless of where they live, implying that geographic mixing alone will not reduce polarization.
-
-An alternative explanation emphasizes information rather than identity.
-Republicans and Democrats may have been exposed to different information about the pandemic through divergent media ecosystems and elite messaging \[CITE\].
-If so, partisan differences in behavior could simply reflect partisan differences in perceived severity: Republicans behaved less cautiously because they genuinely believed the pandemic was less dangerous, based on the information they received.
-This explanation generates specific predictions.
-First, we should observe partisan differences in perceptions of pandemic severity—which prior research confirms \[CITE\].
-Second, and critically, perceptions should strongly predict behavior: those who perceived the pandemic as more severe should have behaved more cautiously.
-If information and perceptions fully mediate the relationship between partisanship and behavior, controlling for perceptions should substantially reduce partisan gaps.
-However, if partisan identity shapes behavior through channels beyond information processing—through social conformity, symbolic expression of group membership, or resistance to outgroup norms—behavioral gaps may persist even among partisans with similar perceptions.
-A third possibility is that stated perceptions are themselves expressions of partisan identity: partisans may report what their group is "supposed" to believe about pandemic severity, even if their actual behavior reveals different risk assessments.
-If Republicans report low concern but behave more cautiously than their stated perceptions would predict, this would suggest that expressed perceptions are partly performative—reflecting what one says as a group member rather than genuine beliefs that drive behavior.
-We examine whether perceptions and behaviors move together, and whether behavioral gaps remain after accounting for perceived severity.
-
-Finally, we examine whether the severity of the pandemic moderates partisan polarization.
-If polarization thrives when threats are abstract but narrows when consequences become concrete and personal, partisan gaps should be smaller during periods of high mortality and incidence, when the pandemic's toll was most visible and immediate.
-Conversely, gaps may widen during periods of lower severity, when there was more room for motivated reasoning and partisan interpretation of ambiguous risk information.
-Such a pattern would suggest that reality can partially override partisan identity when stakes are high enough—but that polarization may return when the immediate threat recedes.
+We exploit variation across policy environments, demographic composition, local partisan context, perceived severity, and pandemic conditions to ask whether partisan gaps narrow where competing theories predict they should.
+If differences are artifacts of policy or place, they should dissolve within comparable environments; if they reflect demographic sorting, they should close after controlling for covariates; if information and perception fully drive behavior, they should disappear among partisans who assess risk similarly; and if objective severity overrides identity, they should narrow when mortality is highest.
+The stakes of adjudication extend beyond academic debate: if partisan gaps are reducible to policy, place, or information, the remedies are institutional; if identity drives behavior independently of these factors, polarization may prove more durable, persisting even as policies converge and information environments shift.
+We refer to this latter possibility as "portable polarization"—the idea that partisans carry their behavioral patterns with them regardless of where they live or what surrounds them, implying that geographic mixing or mandate enforcement alone will not close the gap.
 
 We address two primary research questions.
 First, are partisan differences in health behaviors—social contacts, mask-wearing, and vaccine acceptance—robust to policy environment, geographic context, and demographic composition?
