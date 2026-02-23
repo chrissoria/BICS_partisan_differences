@@ -87,6 +87,9 @@ As visible in the sample sizes, our analytic sample of 18,233 respondents overre
 **Mask-Wearing.**
 
 **Vaccination.**
+Vaccine acceptance was measured in Wave 6 (May 2021) only, when the survey asked respondents whether they had received a COVID-19 vaccine or intended to get one.
+We define vaccine acceptance as a binary indicator equal to one if the respondent was already vaccinated or stated an intention to vaccinate, capturing underlying attitudes toward vaccination independent of differential access across geographic areas during the early rollout period.
+Because vaccination was assessed in a single wave, it cannot be examined temporally across the pandemic or with the same geographic precision as contacts and mask-wearing; analyses of vaccine acceptance are therefore limited to cross-sectional comparisons from May 2021.
 
 ### Political Affiliation
 

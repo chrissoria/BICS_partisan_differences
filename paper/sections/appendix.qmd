@@ -1363,6 +1363,18 @@ The gaps remain stable across model specifications in both district contexts. In
 
 ### Robustness to Model Specification {#sec-cd-context-robustness}
 
+@fig-cd-context-emmeans displays predicted health behaviors by party and congressional district context, showing that partisan gaps persist in both Democratic-led and Republican-led districts.
+
+```{r}
+#| label: fig-cd-context-emmeans
+#| fig-cap: "Predicted Health Behaviors by Party and Congressional District Context. Panels A-B show predicted daily contacts; Panels C-D show predicted mask usage. Left column shows Democratic-led districts; right column shows Republican-led districts. Estimates are adjusted for local incidence, mask mandates, metro status, and demographics. Partisan gaps persist in both district contexts."
+#| fig-height: 6
+#| fig-width: 9
+
+(header_dem | header_rep) / (p_a | p_b) / (p_c | p_d) +
+  plot_layout(heights = c(0.08, 1, 1))
+```
+
 @fig-cd-context-robustness demonstrates that partisan gaps in health behaviors persist regardless of whether we control for local context and demographic characteristics. The figure compares unadjusted estimates (wave only) with adjusted estimates (controlling for incidence, mask mandates, metro status, and demographics).
 
 ```{r}
@@ -2288,6 +2300,17 @@ Unlike health behaviors, which showed clear differential responses to pandemic c
 ## Spatial Variation in Partisan Differences {#sec-spatial-variation}
 
 This section provides additional detail on geographic variation in partisan differences. All estimates in this section are adjusted for survey wave and local mortality rates using regression models, removing potential confounding from differences in when surveys were collected and local pandemic severity. We present behavior levels by party within census regions (complementing the region-level gap maps in the main text), then examine finer geographic scales: census divisions (9 divisions) and states.
+
+@fig-region-levels-map displays adjusted health behavior levels by party and census region.
+
+```{r}
+#| label: fig-region-levels-map
+#| fig-cap: "Adjusted Health Behavior Levels by Party Across Census Regions. Each row shows a partisan group: Republicans (A-B), Independents (C-D), and Democrats (E-F). Left column shows mean daily contacts; right column shows mask usage. Estimates are adjusted for survey wave and local mortality rates. Darker shading indicates higher values. Black borders indicate census region boundaries."
+#| fig-height: 11
+#| fig-width: 10
+
+(p_rep_contacts | p_rep_masks) / (p_ind_contacts | p_ind_masks) / (p_dem_contacts | p_dem_masks)
+```
 
 ### Urban-Rural Behavior Levels by Party {#sec-metro-detail}
 

@@ -81,16 +81,22 @@ ggplot(behavior_data, aes(x = party, y = value, fill = party)) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.15)))
 ```
 
+### Social Contacts
+
 Republicans reported significantly more daily interpersonal contacts than Democrats throughout the study period.
 On average, Republicans reported `r sprintf("%.1f", contacts_rep)` total daily contacts compared to `r sprintf("%.1f", contacts_dem)` for Democrats, a difference of approximately `r sprintf("%.1f", contacts_gap)` contacts per day.
 This gap was even more pronounced for non-household contacts, with Republicans averaging `r sprintf("%.1f", nonhh_rep)` non-household contacts compared to `r sprintf("%.1f", nonhh_dem)` for Democrats.
 Independents fell between the two groups, reporting an average of `r sprintf("%.1f", contacts_ind)` total daily contacts and `r sprintf("%.1f", nonhh_ind)` non-household contacts.
 These differences in contact patterns have important implications for disease transmission, as higher contact rates increase opportunities for viral spread within social networks.
 
+### Mask-Wearing
+
 Partisan differences in mask-wearing were substantial and represented one of the largest behavioral gaps observed in the study.
 Democrats reported wearing masks during `r sprintf("%.1f", mask_dem)`% of their interpersonal contacts, compared to just `r sprintf("%.1f", mask_rep)`% for Republicans---a gap of nearly `r sprintf("%.0f", mask_gap)` percentage points.
 Independents reported mask usage rates (`r sprintf("%.1f", mask_ind)`%) similar to Republicans.
 This partisan gap in mask-wearing was larger than differences observed across other demographic categories including race, gender, and education, highlighting the outsized role of political affiliation in shaping protective behavior during the pandemic.
+
+### Vaccine Acceptance and Risk Perception
 
 Vaccine acceptance, measured during the final survey wave in May 2021, showed pronounced partisan differences.
 We measure vaccine acceptance as either being vaccinated or intending to get vaccinated, which captures underlying attitudes toward vaccination independent of differential access to vaccines across geographic areas during the early rollout period.
@@ -101,13 +107,16 @@ In our sample, `r sprintf("%.1f", concern_dem)`% of Democrats reported being "ve
 These perception differences have been widely documented [@gadarian_partisanship_2021; @milosh_unmasking_2021; @kaushal_american_2022] and likely contribute to the behavioral patterns observed here.
 
 These baseline findings establish that partisan gaps in health behaviors are substantial and consistent across all three outcomes.
-The critical question is whether these differences reflect genuine partisan divergence or can be explained by other factors.
+Because vaccine acceptance was measured only in Wave 6, it does not lend itself to temporal or geographic analysis with the same depth as contacts and mask-wearing; the analyses that follow therefore focus on those two behaviors, which span all six survey waves.
+The critical question is whether the contact and mask gaps reflect genuine partisan divergence or can be explained by other factors.
 We turn next to examining whether perceptions of pandemic severity can account for these behavioral differences, and then whether objective pandemic conditions moderated polarization.
 
 ## Does Perceived Pandemic Severity Mitigate Partisan Behavioral Polarization? {#sec-perceptions}
 
 Democrats were substantially more likely than Republicans to report being "very concerned" about COVID-19 throughout the study period (@fig-perception in @sec-perception-appendix).
 Overall, `r sprintf("%.0f", concern_dem)`% of Democrats expressed high concern, compared to just `r sprintf("%.0f", concern_rep)`% of Republicans; Independents were closer to Republicans at `r sprintf("%.0f", concern_ind)`%.
+
+### Stated Concern and Behavioral Gaps
 
 If partisan differences in behavior are driven by differences in perceived pandemic severity, then partisans who express the same level of concern should behave similarly.
 @fig-concern-gaps tests this by comparing the Republican-Democrat gap in contacts and mask usage within each level of stated concern (see @fig-concern-behavior-appendix for levels by party).
@@ -183,11 +192,11 @@ But this convergence reflects Republicans responding more sharply to concern: Re
 Higher perceived severity narrows the mask gap primarily because Republicans increase their masking at a steeper rate.
 In sum, perceived severity mitigates partisan polarization for mask usage but not for social contacts.
 
-### Temporal Patterns: Do Changes in Perception Drive Changes in Behavior?
+### How Polarization Evolved Over Time
 
-The cross-sectional analysis above pools data across the entire study period, but the pandemic became increasingly politicized over time.
-If polarization grew as masks and COVID-19 responses became partisan flashpoints, we should observe smaller behavioral gaps early in the pandemic, when the threat was novel and less politically charged, and larger gaps later.
-We examine this in stages: first tracking how partisan gaps in behavior evolved over the pandemic, then connecting these patterns to stated perceptions of severity and how changes in perception related to changes in behavior.
+The cross-sectional analysis above asks whether stated concern explains the partisan gap at a given moment — it does not.
+But a complementary question is whether *changes* in objective pandemic severity drove *changes* in the gap over time: did the gap narrow when conditions worsened, as threat override partisan identity, and widen when conditions improved?
+To examine this, we track how partisan behavioral gaps evolved across the six survey waves and connect those patterns to local mortality rates partisans would have observed in real time.
 
 @fig-behaviors-over-time displays health behavior levels by party across survey waves (left column) and the corresponding partisan gaps (right column).
 
@@ -460,14 +469,18 @@ p_gap <- ggplot(gap_data, aes(x = condition, y = gap)) +
 p_contacts + p_gap + plot_layout(widths = c(1.5, 1))
 ```
 
+### When Attitudes and Behavior Diverge
+
 Yet even as behavior responded to mortality, *stated perceptions* told a different story.
 @fig-perception-local-mortality in @sec-perception-vs-local displays each party's concern levels alongside the local mortality rates their respondents experienced.
-Early in the pandemic, perception and mortality moved together: in April 2020, when mortality was high, the partisan gap in concern was at its smallest, and Republicans were more similar to Democrats in their likelihood of reporting being "very concerned." But this alignment was short-lived.
+Early in the pandemic, perception and mortality moved together: in April 2020, when mortality was high, the partisan gap in concern was at its smallest, and Republicans were more similar to Democrats in their likelihood of reporting being "very concerned."
+But this alignment was short-lived.
 As the pandemic became politicized, stated concern decoupled from both mortality rates and behavior.
 The most striking evidence comes from February 2021: mortality reached its peak and the partisan gap in *behavior* narrowed to its smallest point in the study, yet Republican *stated concern* dropped to its lowest (37%; see @fig-perception-levels in @sec-perception-appendix).
 Republicans reduced their contacts when deaths surged, but simultaneously reported *less* worry about the pandemic.
 This disconnect suggests that stated perceptions became performative over time, reflecting what partisans felt they *should* say rather than the risk assessments actually guiding their behavior.
-Stated concern, in other words, increasingly functioned as a marker of partisan identity, even as underlying behavior continued to respond to objective threat.
+Stated concern, in other words, increasingly functioned as a marker of partisan identity — a signal of group allegiance — even as underlying behavior continued to respond to objective threat.
+The implication is significant: cross-sectional analyses linking stated concern to behavior may partly capture partisan performance rather than genuine risk assessment, and partisan gaps in *attitudes* may overstate the true divergence in the beliefs actually guiding behavior.
 For additional analysis of behavior among the "very concerned" over time, including how the contact and mask gaps among this subgroup evolved differently, see @fig-behavior-very-concerned in @sec-behavior-by-concern.
 
 ## Does Local Context Mitigate Partisan Behavioral Polarization? {#sec-space}
@@ -556,19 +569,16 @@ region_boundaries <- us_states_sf %>%
 ```
 
 The preceding analysis focused on how pandemic severity, whether perceived or objective, shaped partisan behavioral differences over time.
-We now turn to a different question: does *where* people live affect partisan polarization?
-If partisan gaps in behavior reflect local policy environments, regional culture, or adaptation to local political norms, we should observe different gap magnitudes across geographic contexts.
+We now turn to whether *where* people live affects partisan polarization.
+If partisan gaps reflect local policy environments, regional culture, or adaptation to local norms, they should narrow or disappear within shared geographic contexts.
 
-Geographic variation in health behaviors differed by party: Democrats varied most in contacts but least in mask usage, while Republicans showed the opposite pattern.
-@fig-region-levels-map displays these adjusted estimates.
-Democrats' contacts ranged by `r sprintf("%.1f", dem_contacts_range)` across regions, compared to `r sprintf("%.1f", rep_contacts_range)` for Republicans.
-For masks, Democrats varied by only `r sprintf("%.0f", dem_masks_range)` pp, while Republicans varied by `r sprintf("%.0f", rep_masks_range)` pp.
+### Geographic and Policy Variation
+
+@fig-region-gap-map displays Republican-Democrat gaps in contacts and mask usage across census regions, adjusted for survey wave and local mortality rates (behavior levels by party and region are shown in @fig-region-levels-map in @sec-spatial-variation).
 
 ```{r}
-#| label: fig-region-levels-map
-#| fig-cap: "Adjusted Health Behavior Levels by Party Across Census Regions. Each row shows a partisan group: Republicans (A-B), Independents (C-D), and Democrats (E-F). Left column shows mean daily contacts; right column shows mask usage. Estimates are adjusted for survey wave and local mortality rates. Darker shading indicates higher values. Black borders indicate census region boundaries."
-#| fig-height: 11
-#| fig-width: 10
+#| label: fig-region-levels-map-setup
+#| include: false
 
 library(patchwork)
 
@@ -642,10 +652,9 @@ p_dem_masks <- plot_usmap(data = dem_for_map, values = "mask_mean", color = "whi
 (p_rep_contacts | p_rep_masks) / (p_ind_contacts | p_ind_masks) / (p_dem_contacts | p_dem_masks)
 ```
 
-To directly compare the magnitude of partisan polarization across regions, @fig-region-gap-map displays the Republican-Democrat gaps in contacts and mask usage.
-The Republican-Democrat contact gap was largest in the `r largest_contact_gap_region$census_region` (`r sprintf("%.1f", largest_contact_gap_region$contacts_gap_rd)` contacts) and smallest in the `r smallest_contact_gap_region$census_region` (`r sprintf("%.1f", smallest_contact_gap_region$contacts_gap_rd)` contacts); the mask gap was similarly largest in the `r largest_mask_gap_region$census_region` (`r sprintf("%.1f", largest_mask_gap_region$mask_gap_dr)` pp) and smallest in the `r smallest_mask_gap_region$census_region` (`r sprintf("%.1f", smallest_mask_gap_region$mask_gap_dr)` pp).
-This smaller gap is primarily driven by Democrats in the South reporting more contacts (`r sprintf("%.1f", dem_south_contacts)`) than Democrats elsewhere (`r sprintf("%.1f", dem_other_contacts)` on average), rather than by Southern Republicans being more cautious.
-Conversely, gaps were largest in the Midwest and West, where Democrats reported the fewest contacts and highest mask usage.[^geo]
+Partisan gaps persist across every region: Republicans reported more daily contacts and lower mask usage than Democrats regardless of where they lived.
+The contact gap was largest in the `r largest_contact_gap_region$census_region` (`r sprintf("%.1f", largest_contact_gap_region$contacts_gap_rd)` contacts) and smallest in the `r smallest_contact_gap_region$census_region` (`r sprintf("%.1f", smallest_contact_gap_region$contacts_gap_rd)` contacts); the mask gap was similarly largest in the `r largest_mask_gap_region$census_region` (`r sprintf("%.1f", largest_mask_gap_region$mask_gap_dr)` pp) and smallest in the `r smallest_mask_gap_region$census_region` (`r sprintf("%.1f", smallest_mask_gap_region$mask_gap_dr)` pp).
+Notably, the smaller gap in the South is driven primarily by Democrats reporting more contacts (`r sprintf("%.1f", dem_south_contacts)`) than Democrats elsewhere (`r sprintf("%.1f", dem_other_contacts)` on average) — consistent with Democrats in a heavily Republican region adjusting toward local norms — rather than by Southern Republicans becoming more cautious.[^geo]
 
 [^geo]: See @sec-spatial-variation for additional geographic breakdowns including vaccination, perception, and finer-grained division and state-level maps.
 
@@ -693,23 +702,16 @@ p_mask_map <- plot_usmap(data = region_gaps_for_map, values = "mask_gap_dr", col
 p_contact_map / p_mask_map
 ```
 
-These regional differences in partisan gaps may reflect local context (urban-rural composition, policy environments) or demographic composition.
-Partisan gaps persisted within each policy environment (@fig-policy-behaviors in @sec-policy-behaviors): Republicans reported more contacts and lower mask usage than Democrats regardless of whether they lived in areas with no mask mandate, less strict mandates, or strict mandates.
-To formally test whether context and demographics explain the gaps, we estimate partisan gaps by region using three nested models (@fig-region-gap-context-adjustment in @sec-context-demographics-robustness).
-For contacts, partisan gaps remain remarkably stable across all three specifications in every region, ranging from 0.7 contacts in the South to 1.5-1.7 contacts elsewhere.
-For masks, gaps shrink modestly with controls but persist: the South's gap decreases from 6.6 to 3.8 percentage points, while the West retains a 12-point gap even in the fully adjusted model.
-These results suggest that partisan identity shapes health behavior largely independent of local context and demographic composition.
+These regional patterns are robust to controls for local context and demographic composition.
+Partisan gaps persisted within each policy environment (@fig-policy-behaviors in @sec-policy-behaviors) and remained stable after adjusting for urbanicity and demographics: contact gaps ranged from 0.7 contacts in the South to 1.5–1.7 contacts elsewhere with minimal change across model specifications; mask gaps shrank modestly but persisted everywhere, with the West retaining a 12-point gap in the fully adjusted model (see @fig-region-gap-context-adjustment in @sec-context-demographics-robustness).
 
-### Behavior in Opposing-Party Areas
+### Behavior in Opposing-Party Contexts
 
-Another potential explanation for geographic variation is that partisans may adapt their behavior to local social norms.
-To test this, we examine whether partisan differences persist depending on whether respondents live in a congressional district represented by a Democrat or a Republican.
+The most direct test of local context effects examines whether partisans adapt their behavior when living among members of the opposing party.
 
 ```{r}
-#| label: fig-cd-context-emmeans
-#| fig-cap: "Predicted Health Behaviors by Party and Congressional District Context. Panels A-B show predicted daily contacts; Panels C-D show predicted mask usage. Left column shows Democratic-led districts; right column shows Republican-led districts. Estimates are adjusted for local incidence, mask mandates, metro status, and demographics. Partisan gaps persist in both district contexts; see @fig-cd-context-robustness in @sec-cd-context-robustness for robustness to model specification."
-#| fig-height: 6
-#| fig-width: 9
+#| label: fig-cd-context-emmeans-setup
+#| include: false
 
 library(emmeans)
 library(patchwork)
@@ -908,17 +910,7 @@ avg_contact_shift <- mean(c(abs(dem_contact_shift), abs(rep_contact_shift)))
 avg_mask_shift <- mean(c(abs(dem_mask_shift), abs(rep_mask_shift)))
 ```
 
-@fig-cd-context-emmeans displays predicted health behaviors by party and congressional district context.
-First, partisans in opposing-party districts behave more like the local majority, though this pattern is stronger for mask usage than for contacts.
-Democrats in Republican-led districts reported `r sprintf("%.1f", dem_contact_shift)` more daily contacts and `r sprintf("%.0f", abs(dem_mask_shift))` percentage points lower mask usage than Democrats in Democratic-led districts.
-Conversely, Republicans in Democratic-led districts reported `r sprintf("%.1f", abs(rep_contact_shift))` fewer contacts and `r sprintf("%.0f", rep_mask_shift)` percentage points higher mask usage than Republicans in Republican-led districts.
-The context-related shifts are modest for contacts (averaging `r sprintf("%.1f", avg_contact_shift)` contacts) but more substantial for mask usage (averaging `r sprintf("%.0f", avg_mask_shift)` percentage points).
-Independents show a similar pattern, with their behavior tracking the local partisan environment.
-
-Second, despite this convergence toward local norms, partisan gaps persist in both contexts.
-Republicans still reported more contacts than Democrats in both Democratic-led districts (gap: `r sprintf("%.1f", contact_gap_dem_district)` contacts) and Republican-led districts (gap: `r sprintf("%.1f", contact_gap_rep_district)` contacts).
-Democrats still wore masks more than Republicans in both contexts (gaps of `r sprintf("%.0f", mask_gap_dem_district)` and `r sprintf("%.0f", mask_gap_rep_district)` percentage points, respectively).
-These gaps are robust to controlling for local incidence, policy, and demographics (see @fig-cd-context-robustness in @sec-cd-context-robustness).
-
-Geographic variation in vaccine acceptance is examined in @sec-spatial-variation.
-Together, these results indicate that partisan gaps in health behavior are robust across geographic contexts: they persist within regions, policy environments, and local partisan contexts, though their magnitude varies in ways that reflect the interplay between individual partisanship and local social environments.
+Partisans in opposing-party congressional districts do adjust their behavior toward local norms — Democrats in Republican-led districts reported `r sprintf("%.1f", dem_contact_shift)` more daily contacts and `r sprintf("%.0f", abs(dem_mask_shift))` percentage points lower mask usage than Democrats in Democratic-led districts, with comparable shifts in the opposite direction for Republicans — but partisan gaps persisted in both contexts (see @fig-cd-context-emmeans in @sec-cd-context-robustness for full estimates).
+Republicans reported more contacts than Democrats in both Democratic-led districts (gap: `r sprintf("%.1f", contact_gap_dem_district)` contacts) and Republican-led districts (gap: `r sprintf("%.1f", contact_gap_rep_district)` contacts); Democrats wore masks more than Republicans in both contexts (gaps of `r sprintf("%.0f", mask_gap_dem_district)` and `r sprintf("%.0f", mask_gap_rep_district)` percentage points, respectively).
+Local partisan context shifted the *level* of behavior for both groups without closing the gap between them.
+Taken together, the geographic evidence points consistently toward partisan identity rather than context as the primary driver of behavioral polarization: gaps persist within regions, policy environments, and local partisan contexts, and where they narrow, it is because members of the minority party adjust toward local norms — not because the majority party becomes more cautious.
