@@ -96,20 +96,10 @@ Democrats reported wearing masks during `r sprintf("%.1f", mask_dem)`% of their 
 Independents reported mask usage rates (`r sprintf("%.1f", mask_ind)`%) similar to Republicans.
 This partisan gap in mask-wearing was larger than differences observed across other demographic categories including race, gender, and education, highlighting the outsized role of political affiliation in shaping protective behavior during the pandemic.
 
-### Vaccine Acceptance and Risk Perception
-
-Vaccine acceptance, measured during the final survey wave in May 2021, showed pronounced partisan differences.
-We measure vaccine acceptance as either being vaccinated or intending to get vaccinated, which captures underlying attitudes toward vaccination independent of differential access to vaccines across geographic areas during the early rollout period.
-Among Democrats, `r sprintf("%.1f", vax_dem)`% accepted vaccines (were vaccinated or intended to be), compared to `r sprintf("%.1f", vax_ind)`% of Independents and `r sprintf("%.1f", vax_rep)`% of Republicans---a `r sprintf("%.0f", vax_gap)` percentage point gap between Democrats and Republicans.
-
-Underlying these behavioral differences were substantial partisan gaps in pandemic risk perception (@fig-perception in @sec-perception-appendix).
-In our sample, `r sprintf("%.1f", concern_dem)`% of Democrats reported being "very concerned" about COVID-19 compared to `r sprintf("%.1f", concern_rep)`% of Republicans---a `r sprintf("%.0f", concern_gap)` percentage point gap.
-These perception differences have been widely documented [@gadarian_partisanship_2021; @milosh_unmasking_2021; @kaushal_american_2022] and likely contribute to the behavioral patterns observed here.
-
-These baseline findings establish that partisan gaps in health behaviors are substantial and consistent across all three outcomes.
-Because vaccine acceptance was measured only in Wave 6, it does not lend itself to temporal or geographic analysis with the same depth as contacts and mask-wearing; the analyses that follow therefore focus on those two behaviors, which span all six survey waves.
-The critical question is whether the contact and mask gaps reflect genuine partisan divergence or can be explained by other factors.
-We turn next to examining whether perceptions of pandemic severity can account for these behavioral differences, and then whether objective pandemic conditions moderated polarization.
+Partisan differences in vaccine acceptance followed the same pattern (see @sec-vaccine-appendix); because vaccination was assessed only in Wave 6 and cannot be examined longitudinally or geographically with the same depth, the analyses that follow focus on contacts and mask-wearing.
+Underlying all three behavioral differences were substantial partisan gaps in pandemic risk perception (@fig-perception in @sec-perception-appendix): `r sprintf("%.0f", concern_dem)`% of Democrats reported being "very concerned" about COVID-19 compared to `r sprintf("%.0f", concern_rep)`% of Republicans---a `r sprintf("%.0f", concern_gap)` percentage point gap documented extensively in prior work [@gadarian_partisanship_2021; @milosh_unmasking_2021; @kaushal_american_2022].
+The critical question is whether these perception differences can fully account for the behavioral gaps, or whether partisan identity shapes behavior through channels beyond information processing.
+We turn to that question next.
 
 ## Does Perceived Pandemic Severity Mitigate Partisan Behavioral Polarization? {#sec-perceptions}
 

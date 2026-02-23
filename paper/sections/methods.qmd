@@ -89,9 +89,9 @@ Our primary contact measure is the total number of face-to-face contacts respond
 Mask usage is derived from the contact-level alter roster. BICS collected detailed information on up to three non-household contacts per respondent; for each of these contacts, respondents indicated which protective behaviors—if any—were used during that interaction, including wearing a face mask. We aggregate these reports to construct a respondent-level measure equal to the percentage of recalled non-household contacts during which the respondent wore a mask (0–100 scale). Because this measure is based on a subset of up to three contacts rather than all contacts reported, it should be interpreted as reflecting mask behavior during a representative sample of a respondent's non-household interactions. This measure captures actual masking behavior during specific interactions rather than general self-reported attitudes toward masks, and is therefore less susceptible to social desirability bias on abstract attitudinal items.
 
 **Vaccination.**
-Vaccine acceptance was measured in Wave 6 (May 2021) only, when the survey asked respondents whether they had received a COVID-19 vaccine or intended to get one.
-We define vaccine acceptance as a binary indicator equal to one if the respondent was already vaccinated or stated an intention to vaccinate, capturing underlying attitudes toward vaccination independent of differential access across geographic areas during the early rollout period.
-Because vaccination was assessed in a single wave, it cannot be examined temporally across the pandemic or with the same geographic precision as contacts and mask-wearing; analyses of vaccine acceptance are therefore limited to cross-sectional comparisons from May 2021.
+Vaccine acceptance was measured in Wave 6 (May 2021) only.
+We define vaccine acceptance as a binary indicator equal to one if the respondent was already vaccinated or stated an intention to vaccinate.
+Because it was assessed in a single wave, vaccine acceptance is not examined in the main analyses; descriptive partisan differences are reported in @sec-vaccine-appendix.
 
 ### Political Affiliation
 
@@ -152,3 +152,22 @@ We examine whether partisan differences vary across geographic contexts by estim
 ### Temporal Dynamics
 
 We assess how partisan differences evolved over time by estimating models separately for each survey wave and by examining interactions between partisanship and survey timing.
+
+## Analytical Framework {.unnumbered}
+
+Our analyses are organized around the competing theoretical explanations introduced above.
+Each explains partisan behavioral gaps differently, and each generates testable predictions about where and when gaps should be largest or smallest.
+
+**Policy and demographics** offer the most straightforward alternative explanations: if partisan gaps reflect where partisans live or who they are, they should shrink within shared policy environments and after demographic adjustment.
+We test this by comparing gaps within strict, lenient, and no-mandate counties and by estimating models that control for age, gender, race, education, and urbanicity.
+
+**Local context and social conformity** predict that partisans should shift toward the behavioral norms of their communities regardless of their own identity.
+If context dominates, a Democrat in a heavily Republican area should behave nearly indistinguishably from their Republican neighbors.
+If identity dominates, gaps should persist within every contextual setting—across regions, urban and rural areas, and opposing-party congressional districts.
+The persistence of gaps across multiple contextual dimensions would constitute evidence for what we call "portable polarization": behavioral patterns that travel with individuals regardless of their environment.
+
+**Information and risk perception** offer a within-person alternative: perhaps partisans behave differently only because they assess risk differently.
+We test this by examining whether gaps close among partisans who report the same level of concern, and whether stated perceptions track behavior or diverge from it in ways consistent with expressive rather than genuine belief.
+
+**Objective pandemic severity** offers a potential override: if concrete, undeniable consequences reduce the space for motivated reasoning, gaps should narrow during high-mortality periods.
+We test this using within-county variation in incidence and mortality rates over time, examining whether partisan behavioral convergence tracks objective conditions rather than stated concern.

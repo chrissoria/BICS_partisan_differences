@@ -1,5 +1,12 @@
 # Appendix
 
+## Vaccine Acceptance {#sec-vaccine-appendix}
+
+Vaccine acceptance, measured during the final survey wave in May 2021, showed pronounced partisan differences.
+We define vaccine acceptance as being vaccinated or intending to get vaccinated, which captures underlying attitudes toward vaccination independent of differential access during the early rollout period.
+Among Democrats, `r sprintf("%.1f", vax_dem)`% accepted vaccines, compared to `r sprintf("%.1f", vax_ind)`% of Independents and `r sprintf("%.1f", vax_rep)`% of Republicans---a `r sprintf("%.0f", vax_gap)` percentage point gap.
+Because vaccination was assessed in a single wave, it cannot be examined temporally or geographically with the same depth as contacts and mask-wearing; this finding should be interpreted as a cross-sectional snapshot from May 2021, early in the U.S. rollout when supply constraints and eligibility tiers varied substantially across states.
+
 ## Pandemic Risk Perceptions Over Time {#sec-perception-appendix}
 
 ```{r}
