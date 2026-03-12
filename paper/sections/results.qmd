@@ -23,16 +23,16 @@ paper_stats <- readRDS(stats_path)
 list2env(paper_stats, envir = environment())
 ```
 
-We structure our results around the competing theoretical explanations outlined in the introduction.
-We first establish that partisan differences in health behaviors exist and are substantial.
-We then test whether these differences can be explained by partisan gaps in risk perception: do partisans who express the same level of concern behave similarly?
-Next, we examine whether objective pandemic severity moderates polarization, testing whether mortality and incidence rates override partisan behavioral patterns.
-Finally, we assess whether these differences can be explained by geographic context, policy environments, or local partisan composition—or whether partisan differences in behavior persist even when you would expect them to dissipate.
+We structure our results as a series of tests designed to adjudicate between the competing theoretical explanations outlined in the introduction.
+Each section confronts a specific theory with the empirical patterns: if the theory is correct, what should we observe—and do we?
+We first establish that partisan differences in health behaviors exist and are substantial, surviving demographic controls that would eliminate them if they were artifacts of compositional differences.
+We then test whether partisan gaps in risk perception can account for behavioral differences, and whether objective pandemic severity overrides partisan identity when the stakes are highest.
+Finally, we assess whether geographic context, policy environments, or local partisan composition can explain the gaps—or whether partisan differences persist even in the conditions where each theory predicts they should disappear.
 
 ## Establishing Partisan Differences in Health Behaviors {#sec-behaviors}
 
 We find substantial partisan differences across all three health behaviors examined: social contacts, mask-wearing, and vaccination.
-These differences were consistent across survey waves and persisted even after controlling for demographic characteristics including age, gender, race, education, and urban/rural residence.
+These differences were consistent across survey waves and persisted even after controlling for demographic characteristics including age, gender, race, education, and urban/rural residence — eliminating the possibility that partisan gaps are artifacts of demographic sorting (the "it's just demographics" explanation).
 Republicans reported the highest levels of social contact, the lowest rates of mask usage, and the lowest vaccine acceptance rates, while Democrats exhibited the opposite pattern.
 Independents generally fell between the two partisan groups, though often closer to Republicans on contact behavior and closer to Democrats on vaccine acceptance.
 @fig-partisan-behaviors provides a visual summary of these differences.
@@ -181,6 +181,9 @@ The mechanism is clear: among the very concerned, Republicans wore masks during 
 But this convergence reflects Republicans responding more sharply to concern: Republicans increased mask usage by `r sprintf("%.0f", mask_slope_rep)` percentage points from "not at all concerned" to "very concerned," compared to `r sprintf("%.0f", mask_slope_dem)` percentage points for Democrats.
 Higher perceived severity narrows the mask gap primarily because Republicans increase their masking at a steeper rate.
 In sum, perceived severity mitigates partisan polarization for both behaviors, though the effect is substantially larger for mask usage than for social contacts.
+These results weigh against the "information and perception" explanation as a complete account: if partisan behavioral differences were simply downstream of different risk perceptions, they should disappear among partisans who express the same level of concern.
+They do not — particularly for contacts, where the gap persists at every concern level.
+Perception matters, but it is insufficient on its own to explain partisan behavioral divergence.
 
 ### How Polarization Evolved Over Time
 
@@ -473,6 +476,12 @@ Stated concern, in other words, increasingly functioned as a marker of partisan 
 The implication is significant: cross-sectional analyses linking stated concern to behavior may partly capture partisan performance rather than genuine risk assessment, and partisan gaps in *attitudes* may overstate the true divergence in the beliefs actually guiding behavior.
 For additional analysis of behavior among the "very concerned" over time, including how the contact and mask gaps among this subgroup evolved differently, see @fig-behavior-very-concerned in @sec-behavior-by-concern.
 
+Taken together, these temporal patterns offer a mixed verdict on the "objective risk overrides identity" explanation.
+For contacts, the theory finds partial support: when mortality was highest, partisan gaps narrowed, suggesting that concrete, immediate threat can temporarily constrain partisan divergence.
+But the theory fails for mask-wearing, where the gap widened steadily regardless of pandemic severity.
+Objective risk can moderate partisan polarization for private, high-stakes behaviors — but it does not override identity for visible, low-cost behaviors that have become markers of group membership.
+The theory is not eliminated outright, but it cannot account for the full pattern.
+
 ## Does Local Context Mitigate Partisan Behavioral Polarization? {#sec-space}
 
 ```{r}
@@ -695,212 +704,13 @@ p_contact_map / p_mask_map
 These regional patterns are robust to controls for local context and demographic composition.
 Partisan gaps persisted within each policy environment (@fig-policy-behaviors in @sec-policy-behaviors) and remained stable after adjusting for urbanicity and demographics: contact gaps ranged from 0.7 contacts in the South to 1.5–1.7 contacts elsewhere with minimal change across model specifications; mask gaps shrank modestly but persisted everywhere, with the West retaining a 12-point gap in the fully adjusted model (see @fig-region-gap-context-adjustment in @sec-context-demographics-robustness).
 
-### Behavior in Opposing-Party Contexts
+These findings eliminate two competing explanations.
+The "it's just policy" theory predicts that partisan gaps should disappear among people living under the same mandate regimes — they do not.
+The "context and culture determine behavior" theory predicts that regional culture should override partisan identity, such that partisans within the South or within metropolitan areas should behave similarly regardless of party — they do not.
+Partisan gaps persist within every policy environment, every region, and every level of urbanicity, ruling out policy and local culture as sufficient explanations.
+Supplementary analyses of partisans living in opposing-party congressional districts tell a consistent story: while partisans do adjust modestly toward local norms, the partisan gap persists in both same-party and cross-party contexts (see @sec-cd-context-robustness).
 
-The most direct test of local context effects examines whether partisans adapt their behavior when living among members of the opposing party.
-
-```{r}
-#| label: fig-cd-context-emmeans-setup
-#| include: false
-
-library(emmeans)
-library(patchwork)
-library(cowplot)
-
-# Load data
-bics <- read_csv("../data/BICS_ZIP_Features.csv", show_col_types = FALSE)
-
-# Filter to valid CD data
-filtered_df <- bics %>%
-  filter(!is.na(political_party) & !is.na(CONGRESSPERSON_PARTY) &
-         political_party != "Prefer not to answer")
-
-# Define factor levels for CD context (all 3 parties)
-cd_levels <- c("Democrat in Democratic led CD",
-               "Democrat in Republican led CD",
-               "Independent in Democratic led CD",
-               "Independent in Republican led CD",
-               "Republican in Democratic led CD",
-               "Republican in Republican led CD")
-
-# =============================================================================
-# CONTACTS - Adjusted model only
-# =============================================================================
-
-cd_contact_model <- lm(num_cc ~ log_prev_week_inc_rate + county_mask_mandate + Metro +
-                         male + resp_educ + resp_yob + resp_hhsize + r_race + r_working +
-                         wave + political_party_to_CD,
-                       data = filtered_df,
-                       weights = weight_pooled)
-
-emm_contact <- emmeans(cd_contact_model, specs = "political_party_to_CD",
-                       nuisance = c("log_prev_week_inc_rate", "county_mask_mandate", "Metro",
-                                    "male", "resp_educ", "resp_yob", "resp_hhsize", "r_race",
-                                    "r_working", "wave"))
-
-emm_contact <- as.data.frame(summary(emm_contact)) %>%
-  filter(political_party_to_CD %in% cd_levels)
-
-# =============================================================================
-# MASKS - Adjusted model only
-# =============================================================================
-
-cd_mask_model <- lm(Norm_Masks_Used ~ log_prev_week_inc_rate + county_mask_mandate + Metro +
-                      male + resp_educ + resp_yob + resp_hhsize + r_race + r_working +
-                      wave + political_party_to_CD,
-                    data = filtered_df,
-                    weights = weight_pooled)
-
-emm_mask <- emmeans(cd_mask_model, specs = "political_party_to_CD",
-                    nuisance = c("log_prev_week_inc_rate", "county_mask_mandate", "Metro",
-                                 "male", "resp_educ", "resp_yob", "resp_hhsize", "r_race",
-                                 "r_working", "wave"))
-
-emm_mask <- as.data.frame(summary(emm_mask)) %>%
-  filter(political_party_to_CD %in% cd_levels)
-
-# =============================================================================
-# PLOTS - 2x2 layout with individual subplot labels
-# =============================================================================
-
-# Parse party and district context from political_party_to_CD
-parse_cd_data <- function(df) {
-  df %>%
-    mutate(
-      party = case_when(
-        grepl("^Democrat", political_party_to_CD) ~ "Democrat",
-        grepl("^Independent", political_party_to_CD) ~ "Independent",
-        grepl("^Republican", political_party_to_CD) ~ "Republican"
-      ),
-      district_context = case_when(
-        grepl("Democratic led CD", political_party_to_CD) ~ "Democratic District",
-        grepl("Republican led CD", political_party_to_CD) ~ "Republican District"
-      ),
-      party = factor(party, levels = c("Democrat", "Independent", "Republican")),
-      district_context = factor(district_context, levels = c("Democratic District", "Republican District"))
-    )
-}
-
-emm_contact <- parse_cd_data(emm_contact)
-emm_mask <- parse_cd_data(emm_mask)
-
-# Party colors
-party_colors <- c("Democrat" = "#2166AC", "Independent" = "#6db753", "Republican" = "#B2182B")
-
-# Create individual plots for each cell
-# Fixed y-axis limits for comparability (wide enough for all error bars)
-contacts_ylim <- c(4, 7.5)
-masks_ylim <- c(40, 80)
-
-# Common theme with subtle horizontal gridlines
-theme_grid <- theme_cowplot() +
-  theme(
-    plot.title = element_text(face = "bold", size = 11),
-    axis.text.x = element_text(size = 10),
-    panel.grid.major.y = element_line(color = "gray85", linewidth = 0.3)
-  )
-
-# A: Contacts in Democratic District
-p_a <- ggplot(emm_contact %>% filter(district_context == "Democratic District"),
-              aes(x = party, y = emmean, color = party)) +
-  geom_point(size = 4) +
-  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
-  scale_color_manual(values = party_colors, guide = "none") +
-  scale_y_continuous(limits = contacts_ylim) +
-  labs(x = NULL, y = "Predicted Daily Contacts", title = "A. Daily Contacts") +
-  theme_grid
-
-# B: Contacts in Republican District
-p_b <- ggplot(emm_contact %>% filter(district_context == "Republican District"),
-              aes(x = party, y = emmean, color = party)) +
-  geom_point(size = 4) +
-  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
-  scale_color_manual(values = party_colors, guide = "none") +
-  scale_y_continuous(limits = contacts_ylim) +
-  labs(x = NULL, y = NULL, title = "B. Daily Contacts") +
-  theme_grid
-
-# C: Masks in Democratic District
-p_c <- ggplot(emm_mask %>% filter(district_context == "Democratic District"),
-              aes(x = party, y = emmean, color = party)) +
-  geom_point(size = 4) +
-  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
-  scale_color_manual(values = party_colors, guide = "none") +
-  scale_y_continuous(limits = masks_ylim) +
-  labs(x = NULL, y = "Predicted Mask Usage (%)", title = "C. Mask Usage") +
-  theme_grid
-
-# D: Masks in Republican District
-p_d <- ggplot(emm_mask %>% filter(district_context == "Republican District"),
-              aes(x = party, y = emmean, color = party)) +
-  geom_point(size = 4) +
-  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
-  scale_color_manual(values = party_colors, guide = "none") +
-  scale_y_continuous(limits = masks_ylim) +
-  labs(x = NULL, y = NULL, title = "D. Mask Usage") +
-  theme_grid
-
-# Create column header labels
-header_dem <- wrap_elements(grid::textGrob("Democratic District",
-                                            gp = grid::gpar(fontsize = 14, fontface = "bold")))
-header_rep <- wrap_elements(grid::textGrob("Republican District",
-                                            gp = grid::gpar(fontsize = 14, fontface = "bold")))
-
-# Combine: header row + contacts row + masks row
-(header_dem | header_rep) / (p_a | p_b) / (p_c | p_d) +
-  plot_layout(heights = c(0.08, 1, 1))
-```
-
-```{r}
-#| label: cd-emmeans-stats
-#| include: false
-
-# Extract statistics for inline reporting from the emmeans calculated above
-# Calculate gaps: Republican - Democrat within each district context
-
-# Contact gaps
-contact_gap_dem_district <- emm_contact$emmean[emm_contact$party == "Republican" & emm_contact$district_context == "Democratic District"] -
-                            emm_contact$emmean[emm_contact$party == "Democrat" & emm_contact$district_context == "Democratic District"]
-contact_gap_rep_district <- emm_contact$emmean[emm_contact$party == "Republican" & emm_contact$district_context == "Republican District"] -
-                            emm_contact$emmean[emm_contact$party == "Democrat" & emm_contact$district_context == "Republican District"]
-
-# Mask gaps (D - R, since Democrats wear more)
-mask_gap_dem_district <- emm_mask$emmean[emm_mask$party == "Democrat" & emm_mask$district_context == "Democratic District"] -
-                         emm_mask$emmean[emm_mask$party == "Republican" & emm_mask$district_context == "Democratic District"]
-mask_gap_rep_district <- emm_mask$emmean[emm_mask$party == "Democrat" & emm_mask$district_context == "Republican District"] -
-                         emm_mask$emmean[emm_mask$party == "Republican" & emm_mask$district_context == "Republican District"]
-
-# Independent positions
-ind_contact_dem_district <- emm_contact$emmean[emm_contact$party == "Independent" & emm_contact$district_context == "Democratic District"]
-ind_contact_rep_district <- emm_contact$emmean[emm_contact$party == "Independent" & emm_contact$district_context == "Republican District"]
-ind_mask_dem_district <- emm_mask$emmean[emm_mask$party == "Independent" & emm_mask$district_context == "Democratic District"]
-ind_mask_rep_district <- emm_mask$emmean[emm_mask$party == "Independent" & emm_mask$district_context == "Republican District"]
-
-# Context effects: how much do partisans shift when in opposing-party districts?
-# Democrats in Rep vs Dem districts
-dem_contact_in_dem <- emm_contact$emmean[emm_contact$party == "Democrat" & emm_contact$district_context == "Democratic District"]
-dem_contact_in_rep <- emm_contact$emmean[emm_contact$party == "Democrat" & emm_contact$district_context == "Republican District"]
-dem_contact_shift <- dem_contact_in_rep - dem_contact_in_dem  # positive = more contacts in Rep district
-
-dem_mask_in_dem <- emm_mask$emmean[emm_mask$party == "Democrat" & emm_mask$district_context == "Democratic District"]
-dem_mask_in_rep <- emm_mask$emmean[emm_mask$party == "Democrat" & emm_mask$district_context == "Republican District"]
-dem_mask_shift <- dem_mask_in_rep - dem_mask_in_dem  # negative = fewer masks in Rep district
-
-# Republicans in Dem vs Rep districts
-rep_contact_in_dem <- emm_contact$emmean[emm_contact$party == "Republican" & emm_contact$district_context == "Democratic District"]
-rep_contact_in_rep <- emm_contact$emmean[emm_contact$party == "Republican" & emm_contact$district_context == "Republican District"]
-rep_contact_shift <- rep_contact_in_dem - rep_contact_in_rep  # negative = fewer contacts in Dem district
-
-rep_mask_in_dem <- emm_mask$emmean[emm_mask$party == "Republican" & emm_mask$district_context == "Democratic District"]
-rep_mask_in_rep <- emm_mask$emmean[emm_mask$party == "Republican" & emm_mask$district_context == "Republican District"]
-rep_mask_shift <- rep_mask_in_dem - rep_mask_in_rep  # positive = more masks in Dem district
-
-# Average absolute shifts for comparison
-avg_contact_shift <- mean(c(abs(dem_contact_shift), abs(rep_contact_shift)))
-avg_mask_shift <- mean(c(abs(dem_mask_shift), abs(rep_mask_shift)))
-```
-
-Partisans in opposing-party congressional districts do adjust their behavior toward local norms — Democrats in Republican-led districts reported `r sprintf("%.1f", dem_contact_shift)` more daily contacts and `r sprintf("%.0f", abs(dem_mask_shift))` percentage points lower mask usage than Democrats in Democratic-led districts, with comparable shifts in the opposite direction for Republicans — but partisan gaps persisted in both contexts (see @fig-cd-context-emmeans in @sec-cd-context-robustness for full estimates).
-Republicans reported more contacts than Democrats in both Democratic-led districts (gap: `r sprintf("%.1f", contact_gap_dem_district)` contacts) and Republican-led districts (gap: `r sprintf("%.1f", contact_gap_rep_district)` contacts); Democrats wore masks more than Republicans in both contexts (gaps of `r sprintf("%.0f", mask_gap_dem_district)` and `r sprintf("%.0f", mask_gap_rep_district)` percentage points, respectively).
-Local partisan context shifted the *level* of behavior for both groups without closing the gap between them.
-Taken together, the geographic evidence points consistently toward partisan identity rather than context as the primary driver of behavioral polarization: gaps persist within regions, policy environments, and local partisan contexts, and where they narrow, it is because members of the minority party adjust toward local norms — not because the majority party becomes more cautious.
+Taken together, the full set of results points to a single surviving explanation: partisan identity itself drives behavioral polarization.
+The gaps cannot be reduced to demographics, risk perception, objective severity, policy environments, or regional culture.
+Each of these factors matters at the margins — perception narrows the mask gap among the very concerned, mortality temporarily compresses the contact gap, and regional context shifts absolute levels — but none eliminates the fundamental partisan divide.
+What remains is "portable polarization": partisan identity travels with individuals, shaping their health behaviors regardless of where they live, what policies govern them, or what risks surround them.

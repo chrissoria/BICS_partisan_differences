@@ -1,0 +1,369 @@
+---
+# PAPER GENRE: Empirical Health Behavior / Social Determinants Study
+# JOURNAL: Journal of Health and Social Behavior
+#
+# JHSB is a sociology journal — not an epidemiology journal. Papers must
+# advance sociological THEORY about health, not just report associations.
+# The theoretical contribution is the paper's primary value proposition.
+#
+# GENRE CONTEXT (from catademic classification of 134 JHSB papers, 2023–2026):
+#   41.8% — Racial/ethnic health disparities and structural racism
+#   23.1% — Education and health outcomes
+#   16.4% — Primarily theoretical or conceptual
+#   14.2% — American politics, governance, or policy
+#    9.0% — COVID-19 pandemic impacts
+#   38.1% — Other (immigration, family structure, mental health, medical sociology)
+#
+# ABSTRACT STRUCTURE (derived from sentence-level coding of 5 JHSB papers):
+#   6 moves in ~8-10 sentences. Theory is always named, not left implicit.
+#   Gap is framed as a conceptual limitation, not "no one has studied X."
+#   Findings use sociological language, not just statistical results.
+#
+title: "[Social Factor] and [Health Outcome]: [Specification]"
+author:
+  - name: [Author Name]
+    affiliation: [Institution]
+    email: [email]
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+  pdf:
+    toc: true
+    number-sections: true
+bibliography: references.bib
+---
+
+# Abstract
+
+<!-- 8-10 sentences total, 6 moves:
+1. Field positioning (1-2 sentences)
+2. Gap / reframe (1-2 sentences) — conceptual, not just "no one has studied X"
+3. This paper (1 sentence) — active verb: explores, examines, asks
+4. Data (1 sentence) — method, sample, scope in one sentence
+5. Findings (2-3 sentences) — sociological language, not just statistics
+6. So-what (1 sentence) — theoretical significance, not just policy
+-->
+
+
+# Introduction
+
+<!-- ~4 paragraphs. Funnels from broad to specific. Findings previewed — no suspense. -->
+
+<!-- P1: Problem + stakes.
+Establish the societal problem with empirical evidence. Make it concrete
+and timely. -->
+
+<!-- P2: Literature → gap.
+Review what the field knows, then pivot to what it doesn't. The gap is
+a conceptual failure, not just absence — "existing work overlooks" or
+"reduces this to X." -->
+
+<!-- P3: This paper + theoretical positioning.
+What this study does AND why the dominant approach is insufficient.
+Name the alternative lens. State the method. -->
+
+<!-- P4: Findings preview + significance.
+Give away the answer. State the theoretical contribution. Final sentence
+generalizes beyond the specific case. -->
+
+
+# Background
+
+<!-- The funnel isn't just Introduction → Background. It operates WITHIN
+Background too. The subsections move from WHAT → WHAT SPECIFICALLY → WHY:
+  Topic 1: The broad phenomenon (empirical, ~3 paragraphs)
+  Topic 2: The specific driver (empirical, ~3 paragraphs)
+  Topic 3: The theoretical framework (theory, ~5 paragraphs — longest, comes last)
+Each subsection narrows from the previous one. Topics 1-2 are empirical
+reviews; Topic 3 is where the paper stakes its intellectual claim. The theory
+subsection is the destination the funnel has been building toward. -->
+
+## [Topic 1: The Phenomenon]
+
+<!-- ~3 paragraphs per subsection. -->
+
+<!-- P1: Define + frame.
+Define the phenomenon. Name the field's dominant framework. Acknowledge its
+influence, then pivot: "However, research has not fully explored..." Connect
+to your theoretical terrain. -->
+
+<!-- P2: Evidence review.
+Survey empirical literature across populations/contexts. Introduce bridging
+concepts that link existing work to your angle. Synthesize at the end. -->
+
+<!-- P3: Bridge to this study.
+"This study builds on this body of work by..." Name what the dominant
+approach misses. State the methodological or conceptual contribution. -->
+
+## [Topic 2: The Specific Driver / Mechanism]
+
+<!-- Narrows from the broad phenomenon to the specific angle this paper
+investigates. Traces the causal or historical pathway — not just "studies
+found X" but how the mechanism developed over time. Each citation adds a
+link in the chain. Ends with a more specific bridge to this study than
+Topic 1 did. -->
+
+<!-- P1: Establish the specific angle + show it predates the current moment +
+identify what's still missing. -->
+
+<!-- P2: Trace the causal/historical pathway. Walk through the mechanism:
+how did we get here? Each citation adds a link in the chain. -->
+
+<!-- P3: Synthesize + restate the gap (now more specific) + position this study. -->
+
+## [Topic 3: The Theoretical Framework]
+
+<!-- The deepest part of the funnel. Longer than the empirical subsections
+(~5 paragraphs). This is where the paper plants its theoretical flag. -->
+
+<!-- P1: Name the framework + core insights.
+Name the approach and its intellectual lineage. Acknowledge existing work,
+then identify what it leaves implicit. Deliver the framework's core insights
+(can number them). -->
+
+<!-- P2: Apply the framework to the paper's domain.
+Redefine key concepts through the framework's lens. State what it explains
+for this topic. Introduce the paper's specific theoretical constructs. -->
+
+<!-- P3: Define construct 1.
+Formal definition. Historical grounding. Pivot to the present — how current
+conditions (e.g., polarization) disrupt or activate it. Key claim: the
+construct is relational / contingent / mediated by X. -->
+
+<!-- P4: Define construct 2.
+Formal definition. How it operates as a cognitive mechanism. How it applies
+to the paper's domain. How current conditions reinforce it. -->
+
+<!-- P5: Synthesize.
+"Taken together..." State what the combined framework reveals. Reframe the
+debate: it's not about X, it's about Y. This is the theoretical punchline —
+the claim the rest of the paper tests. -->
+
+## The Current Study
+
+<!-- ~3 paragraphs. Translates the theoretical framework into bounded,
+testable claims. More modest in tone than the theory section. -->
+
+<!-- P1: Link theory to testable claims.
+Restate the central mechanism from Topic 3. Name the specific measures
+that capture the constructs. Deliver the primary hypothesis. -->
+
+<!-- P2: Introduce variation / moderation.
+What conditions might alter the main relationship? Explain the mechanism.
+Deliver secondary hypothesis(es). -->
+
+<!-- P3: Scope the contribution.
+What this study provides (empirical strategy, new measures, etc.) and
+what it does NOT claim to do. Ground the contribution in the specific
+context. -->
+
+
+# Data and Methods
+
+## Data
+
+<!-- ~3 paragraphs + instrument table. -->
+
+<!-- P1: Source + design + sample.
+Name the survey, funder, who administered it, sampling frame. Note design
+strengths relevant to this study. State full N → analytic N with reason
+for any restriction. -->
+
+<!-- [Table: Survey instrument / vignette wording placed here if applicable.
+Reader sees exactly what was measured before prose continues.] -->
+
+<!-- P2: Representativeness.
+Compare sample to national benchmarks. Acknowledge deviations and explain
+why acceptable. State how deviations are handled (controls, weights). -->
+
+<!-- P3: Missing data strategy.
+Name the technique, justify briefly. One paragraph. -->
+
+<!-- P4: Survey design details (~1 paragraph).
+How items were administered — randomization, embedding within broader
+modules, strategies to minimize response bias / priming. -->
+
+<!-- P5: Data limitations (~1 paragraph).
+Enumerate specific limitations (nonresponse bias, sample deviations,
+data age, etc.). State how each is mitigated. End with call for future
+replication if applicable. Note: data limitations can appear here in
+Methods rather than only in Discussion. -->
+
+## Measures
+
+### Dependent Variable(s)
+
+<!-- ~3 paragraphs. -->
+
+<!-- P1: Introduce what's measured + framing.
+State the constructs being captured. Present vignette or framing text
+verbatim if applicable. -->
+
+<!-- P2: List specific items.
+Name each dimension / indicator. Provide exact item wording. -->
+
+<!-- P3: Coding + validation.
+How responses were coded (direction, scaling). Validation technique
+(CFA, factor loadings, alpha, etc.). Reference tables for full wording
+and descriptive frequencies. -->
+
+### Key Independent Variable(s)
+
+<!-- ~1 paragraph. More compact than DVs. Name the items, give scale details,
+validate (CFA, alpha, etc.), and state where it enters the model. -->
+
+### Control Variables
+
+<!-- ~1 paragraph. Front-load the most theoretically relevant control and
+give it 2-3 sentences (how measured, scored, scaled). Then list remaining
+demographic/contextual controls efficiently with coding details. Reference
+appendix for descriptive statistics. Close with a sentence justifying the
+set as a whole. -->
+
+## Analytical Strategy
+
+<!-- Longest Methods subsection (~6 paragraphs). Every modeling choice is
+tied back to theory, not just stated as a technical decision. Each
+hypothesis gets its own model paragraph. -->
+
+<!-- P1: Roadmap.
+"The analysis proceeded in N stages." Name each stage briefly. -->
+
+<!-- P2: Justify the method.
+Why this technique fits this theory. What it does technically. What
+problems it avoids vs. alternatives. -->
+
+<!-- P3: Formal specification.
+Equations or model structure. Define terms. State estimation method
+with justification (why it fits the data). -->
+
+<!-- P4: Model for H1.
+Describe model constraints that operationalize H1. What the specification
+assumes. Reference a conceptual figure. Acknowledge limitations of the
+specification. -->
+
+<!-- P5: Model for H2 (or alternative specification).
+How it relaxes/extends the H1 model. Name each modification with
+theoretical justification. Include interaction terms if applicable. -->
+
+<!-- P6: Model fit.
+Name fit statistics, state thresholds, report verdict. -->
+
+
+# Results
+
+<!-- ~8 paragraphs of prose + tables. No subsection headers — results are
+presented as a single continuous section.
+
+KEY PRINCIPLES (derived from paragraph-level coding):
+- Structure mirrors the hypotheses: test H1, test H2, extend, confirm.
+- Every paragraph has exactly one job.
+- Open with credibility: validate measurement BEFORE presenting substance.
+  The reader must trust the instruments before they'll trust the results.
+- Orient the reader: teach them how to read the table, walk through the
+  least controversial column first, earn trust on the easy stuff before
+  the main results.
+- Lead each hypothesis paragraph with the verdict, then show the evidence.
+  Name the hypothesis explicitly ("supports H1") — no ambiguity.
+- Report interactions substantively, not just statistically. Show the math
+  (combined effect at +1 SD) and connect to prior research.
+- Compare magnitudes across predictors — this is the interpretive move
+  that makes coefficients meaningful ("as large as political orientation
+  but in the opposite direction").
+- Simpler hypotheses get shorter paragraphs. Don't pad.
+- Extend beyond the hypotheses to show relational/contrasting patterns.
+  The paper doesn't just test its claims, it shows the broader landscape.
+- Non-findings are interpreted, not hidden. Explain WHY the mechanism
+  doesn't apply in a given case.
+- Close with model comparison as a final confirmation device — not just
+  "our model fits" but "our model fits better than alternatives." Tie
+  each comparison back to a specific hypothesis.
+- Arc: validate → orient → H1 → H2 → extend → extend → confirm. -->
+
+<!-- P1: Validate measurement.
+Present CFA / factor loadings. Note stability across specifications.
+Establish that measurement is sound before moving to substance. -->
+
+<!-- [Table: CFA / factor loadings] -->
+
+<!-- P2: Name the constructs + validate key IV.
+Define what the latent variables capture (give them a collective label).
+Apply same validation to the independent variable. Note supplementary
+robustness checks. -->
+
+<!-- P3: Model fit + covariates model.
+Report overall model fit (RMSEA, CFI, etc.). Walk through the "baseline"
+column — what predicts the key IV. Flag surprising findings. -->
+
+<!-- [Table: Full structural model / regression results] -->
+
+<!-- P4: H1 test — primary outcome.
+State whether hypothesis is supported. Report the key coefficient +
+interaction if applicable. Connect to prior research. Note indirect
+effects. -->
+
+<!-- P5: H2 test — secondary mechanism.
+Report direct effects supporting H2. Compare magnitude to the primary
+predictor. State the substantive interpretation. -->
+
+<!-- P6: Extend the logic — additional outcome(s).
+Examine secondary outcomes to show relational or contrasting patterns.
+How does the primary predictor operate differently here? Theoretical
+interpretation. -->
+
+<!-- P7: Further extension — remaining outcome(s).
+If a third outcome reveals different drivers, interpret why. Reinforce
+the theoretical framework. Note non-findings explicitly. -->
+
+<!-- P8: Model comparison / robustness.
+Compare full model to alternative specifications. Which constraints
+improve or worsen fit? Final verdict: results substantiate both
+hypotheses. -->
+
+<!-- [Table: Alternative model comparisons] -->
+
+
+# Discussion
+
+<!-- ~5 paragraphs. No subsection headers — presented as continuous prose.
+Opens by situating findings in intellectual tradition, closes by zooming
+out to broadest significance. Limitations are integrated into P3, not
+quarantined in their own section. -->
+
+<!-- P1: Historical/theoretical anchor + core finding.
+Open with a canonical citation or foundational idea that frames the
+findings in a broader sociological lineage. Connect that tradition to
+the present moment. Restate the core finding. Reframe the phenomenon —
+it's not about X, it's about Y. -->
+
+<!-- P2: Findings summary + mechanism + intervention point.
+Restate key results in conceptual language (not coefficients). Name the
+surprising finding. Name the counterweight or moderating force. Final
+sentence identifies a practical implication — grounded in findings, not
+generic. -->
+
+<!-- P3: Theoretical contribution + practical implications + limitations.
+State the contribution to the field explicitly. Name what the framework
+adds. Pivot to practical implications. Then limitations — scoped honestly.
+Reframe limitations as strengths where possible (enduring patterns, tools
+that can be extended). -->
+
+<!-- P4: Future directions.
+Each direction tied to a specific limitation or finding:
+  - Longitudinal (addresses cross-sectional limitation)
+  - Comparative (addresses single-context limitation)
+  - Other domains (addresses generalizability)
+  - Experimental (addresses causal claims) -->
+
+<!-- P5: Closing.
+Zoom out beyond the specific study. State what KIND of understanding is
+needed (sociological, not just technical). Final sentence is forward-looking
+and normative — what the field or society needs. -->
+
+
+# References
+
+::: {#refs}
+:::

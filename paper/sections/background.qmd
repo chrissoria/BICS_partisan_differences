@@ -1,0 +1,133 @@
+---
+editor:
+  markdown:
+    wrap: sentence
+---
+
+# Background
+
+<!-- JHSB outline: The funnel operates WITHIN Background too.
+  Topic 1: The broad phenomenon (empirical, ~3 paragraphs)
+  Topic 2: The specific driver (empirical, ~3 paragraphs)
+  Topic 3: The theoretical framework (theory, ~5 paragraphs — longest, comes last)
+Each subsection narrows from the previous one. Topics 1-2 are empirical
+reviews; Topic 3 is where the paper stakes its intellectual claim. -->
+
+## Partisan Differences in Health Behavior
+
+<!-- P1: Define + frame.
+Define the phenomenon. Name the field's dominant framework. Acknowledge its
+influence, then pivot: "However, research has not fully explored..." -->
+
+A growing literature documents partisan differences in health-related attitudes and behaviors during the COVID-19 pandemic.
+In one of the earliest and most influential studies, @gadarian_partisanship_2021 showed that partisan identity predicted attitudes toward social distancing, mask-wearing, and government intervention even after controlling for demographics, local case rates, and media consumption, suggesting that party identification operated as more than a proxy for other characteristics [see also @allcott_polarization_2020; @grossman_political_2020; @clinton_partisan_2021].
+These attitudinal differences appeared to have real consequences: county-level analyses linked Republican vote share to higher COVID-19 case and death rates, particularly after the initial wave [@gollwitzer_partisan_2020; @krieger_relationship_2022; @neelon_spatial_2021], and @coleman_hurt_2024 found that political orientation predicted individual self-rated health and well-being during the pandemic even after accounting for local severity.
+However, most of this work relies on aggregate data or attitudinal measures rather than direct assessments of individual behavior, leaving open the question of whether individual partisans actually *behaved* differently or whether observed patterns reflect the demographic and geographic sorting of partisans into different environments.
+
+<!-- P2: Evidence review.
+Survey empirical literature across populations/contexts. Synthesize at the end. -->
+
+Studies that do examine individual behavior generally confirm partisan differences, but with important limitations.
+@milosh_unmasking_2021 found that mask adoption was 12 percentage points lower in Republican-leaning counties even after accounting for local case rates, and @kaushal_american_2022 documented persistent partisan gaps in social distancing that widened over time [see also @pink_elite_2021].
+County-level GPS data told a similar story: @allcott_polarization_2020 found that Republicans engaged in significantly less social distancing even after controlling for local disease severity [see also @gollwitzer_partisan_2020].
+@clinton_partisan_2021, using over one million individual survey responses, found that partisan differences in social activity were initially small but widened substantially over time, with Republicans increasing social activities by 75% compared to 47% for Democrats, and that these gaps far exceeded differences between the most and least severely affected communities.
+Yet even these studies leave key questions unresolved: the county-level analyses cannot separate individual identity from place-level confounds, and the individual-level survey work, while documenting the temporal arc, did not systematically test whether partisan gaps survive within shared policy, geographic, and demographic contexts.
+A Democrat in San Francisco and a Republican in rural Alabama differ not only in party identification but in the mandates they face, the norms that surround them, and the information they receive.
+Existing work has not systematically tested whether partisan behavioral gaps survive within shared contexts.
+
+<!-- P3: Bridge to this study. -->
+
+This study builds on this body of work by moving from aggregate patterns and attitudinal measures to individual-level behavioral data: actual counts of daily contacts and mask usage during specific interactions.
+Crucially, the design of our data allows us to test whether partisan differences persist within comparable policy, geographic, and demographic contexts, the comparison that existing work has largely been unable to make.
+By holding context constant and asking whether partisan gaps survive, we can begin to distinguish identity-driven behavioral divergence from the confounding effects of place.
+
+## Partisanship as Social Identity and the Politicization of Health
+
+<!-- P1: Establish the specific angle + show it predates the current moment +
+identify what's still missing. -->
+
+The transformation of partisanship from a set of policy preferences into a fundamental social identity provides the theoretical foundation for expecting behavioral divergence.
+Over the past several decades, party identification in the United States has evolved into a primary group attachment that rivals race, religion, and ethnicity in psychological salience [@kalmoe_radical_2022; @iyengar_fear_2015; @green_elusive_2020].
+Americans increasingly select friends, neighbors, and romantic partners based on party affiliation; they express greater social distance from and animosity toward members of the opposing party; and they view events through the lens of partisan group membership rather than ideological principle [@iyengar_fear_2015; @iyengar_strengthening_2018].
+Social identities do not merely correlate with behavior — they drive it, through mechanisms including in-group conformity, social pressure, and responsiveness to elite cues [@de_hoog_social_2024].
+Health sociology has increasingly recognized this dynamic: research on health lifestyles shows that health behaviors cluster into integrated patterns undergirded by group-based identities and norms rather than individual calculation [@cockerham_health_2005; @mollborn_contributions_2021], suggesting that the same identity-driven processes documented in partisan politics may operate in the health domain.
+
+<!-- P2: Trace the causal/historical pathway. -->
+
+These dynamics found fertile ground in the domain of public health.
+Trust in scientific institutions had already been diverging along ideological lines well before COVID-19: @gauchat_politicization_2012 documented a long-term decline in trust in science among conservatives beginning in the 1970s, a decline concentrated among the most educated, suggesting that the politicization of science is not a knowledge deficit but an identity-driven process.
+Parallel data on partisan identification tell a similar story: confidence in science among Republicans dropped sharply beginning in the mid-2000s, even as Democratic confidence held steady or increased [@gallup_confidence_2021].
+The pandemic dramatically accelerated this trend [@van_bavel_political_2024], and recent work in this journal has shown that the resulting polarization is not simply a matter of knowledge deficits: @gauchat_partisan_2025 found that conservative distrust of scientific authorities on vaccination was actually *magnified* among the scientifically literate, suggesting that partisan identity structures how people evaluate expert claims rather than whether they understand them.
+Questions that epidemiologists viewed as empirical — How severe is the virus? Do masks reduce transmission? Are vaccines safe and effective? — became markers of partisan allegiance [@gadarian_partisanship_2021; @rothgerber_politicizing_2020].
+Republican political leaders and conservative media figures frequently downplayed the pandemic's severity and questioned the efficacy of protective behaviors, while Democratic leaders emphasized the threat and urged compliance with public health guidance [@gadarian_trump_2024; @green_elusive_2020].
+
+<!-- P3: Synthesize + restate the gap (now more specific) + position this study. -->
+
+If partisanship functions as a social identity, and if health behaviors became symbols of that identity, we should expect partisans to have diverged in their behavioral responses, not merely because they lived in different policy environments, but because their social identities motivated different responses to the same threat.
+The question is not whether partisans *said* different things about the pandemic (they clearly did) but whether they *did* different things, and whether those behavioral differences can be reduced to the contexts in which partisans are embedded or whether they reflect the independent force of identity itself.
+
+## Competing Explanations for Partisan Health Gaps
+
+<!-- P1: Name the framework + core insights.
+This is where the paper plants its theoretical flag. The competing-theories
+elimination framework is the paper's intellectual contribution. -->
+
+We organize our analysis around a set of competing theoretical explanations for partisan behavioral gaps, each of which generates testable predictions about when and where gaps should appear or disappear.
+This approach, using patterns of contextual variation to adjudicate between theories, allows us to constrain the set of plausible explanations even though we cannot directly test causal mechanisms.
+The framework yields two core insights: (1) each theory implies that partisan gaps should narrow or vanish under specific conditions, so persistent gaps under those conditions constitute evidence against that theory; and (2) if gaps persist across *all* conditions where alternative theories predict they should disappear, the surviving explanation is that partisan identity itself drives behavior.
+
+<!-- P2: Apply the framework — policy and demographics. -->
+
+The most straightforward alternative explanations emphasize policy environments and demographic composition.
+Democrats were concentrated in urban areas governed by officials who implemented stricter lockdowns, mask mandates, and business closures; Republicans lived in areas with fewer restrictions.
+If partisan gaps are artifacts of these policy differences, they should disappear when we compare partisans within the same policy regime: within strict mandate areas, within lenient areas, and within areas with no mandates.
+Similarly, if gaps reflect the fact that Democrats and Republicans differ in age, education, urbanicity, and other characteristics associated with health behavior, controlling for these demographics should eliminate the gaps.
+
+<!-- P3: Define construct 1 — context vs. identity. -->
+
+A deeper challenge comes from explanations rooted in local context and social conformity.
+Research has documented powerful contextual effects on health outcomes. For example, @montez_stability_2025 showed that county-level characteristics such as economic conditions, healthcare infrastructure, and social capital predicted mortality rates, and that some of these contextual associations shifted during the pandemic.
+If behavior is primarily shaped by such local conditions and norms rather than individual identity, partisans in the same environment should behave similarly; a Democrat in a Republican-majority area should be nearly indistinguishable from her Republican neighbors.
+@baxter-king_how_2022 provide the most direct test of this prediction for mask-wearing, finding that Republicans were less likely to wear masks as the Republican share of their zip code increased, while Democratic mask-wearing was unaffected by local partisan context, suggesting that contextual effects on visible health behaviors may operate asymmetrically across partisan groups.
+This "context dominates" prediction can be tested across multiple dimensions: partisan composition, urbanicity, region, and policy environment.
+If partisan gaps persist across all of these contextual comparisons, it would provide strong evidence that identity drives behavior independent of local culture, what we term "portable polarization": the idea that partisans carry their behavioral patterns with them regardless of where they live or what surrounds them.
+Importantly, portable polarization does not require that gaps are identical in every context; it requires only that they persist.
+Context may shift absolute levels of behavior for all groups without closing the partisan divide, and variation in gap magnitude across contexts is itself analytically informative, potentially revealing which groups are more responsive to local conditions and which are more anchored to nationally circulated partisan cues.
+
+<!-- P4: Define construct 2 — information/perception and severity. -->
+
+An alternative within-person explanation emphasizes information and risk perception: Republicans and Democrats may have been exposed to different information through divergent media ecosystems and elite messaging [@baum_red_2011; @graf_selective_2008], leading to different assessments of pandemic severity that in turn produced different behaviors.
+Work in this journal supports the plausibility of this pathway: @hawks_cultural_2025 showed that perceived legitimacy of public health authorities and shared health values predicted compliance with COVID-19 directives, suggesting that the informational and cultural context through which partisans evaluate health guidance may shape behavioral responses.
+If this account is correct, partisan gaps should substantially close among partisans who report the same level of concern.
+However, if stated perceptions are themselves expressions of partisan identity, if partisans report what their group is "supposed" to believe rather than what actually guides their behavior, then perceptions may fail to account for behavioral differences.
+A related question concerns whether objective pandemic severity can override partisan divergence: if polarization thrives when threats are abstract but narrows when consequences become concrete and personal, gaps should be smaller during high-mortality periods and larger when the threat is distant.
+
+<!-- P5: Synthesize.
+"Taken together..." This is the theoretical punchline. -->
+
+Taken together, these competing explanations define a logical space within which our empirical analysis operates.
+The question is not whether partisanship correlates with behavior (prior work establishes that it does) but whether that correlation reflects the independent force of partisan identity or can be reduced to policy, place, demographics, information, or objective conditions.
+The identity account generates a distinctive prediction that separates it from all contextual alternatives: if partisan identity shapes health behavior through the mechanisms described above (group conformity, symbolic boundary maintenance, and responsiveness to nationally circulated elite cues) then its behavioral effects should be *portable*, traveling with individuals regardless of local context, because the sources of partisan influence (national media, party leaders, co-partisan social networks) are not geographically bounded in the way that policy environments, local norms, and demographic compositions are.
+If gaps persist after each alternative explanation has been given its best chance to account for them, within shared policy regimes, across regions, in both urban and rural settings, and regardless of local partisan composition, the surviving interpretation is that partisan identity has become a fundamental driver of health behavior, one whose influence operates through channels that transcend place.
+
+## The Current Study
+
+<!-- P1: Link theory to testable claims. -->
+
+Drawing on the competing-theories framework outlined above, we examine two primary research questions.
+First, are partisan differences in health behaviors (social contacts, mask-wearing, and vaccine acceptance) robust to policy environment, geographic context, and demographic composition?
+Second, under what conditions are partisan gaps in health behavior largest versus smallest?
+We test each competing explanation by examining whether partisan gaps narrow where that theory predicts they should: within shared policy environments, after demographic adjustment, among partisans with similar risk perceptions, during high-severity periods, and across diverse geographic contexts.
+
+<!-- P2: Introduce variation / moderation. -->
+
+We expect the magnitude of partisan gaps to vary across behaviors and conditions.
+Behaviors that are visible and low-cost, such as mask-wearing, may be more susceptible to partisan signaling than behaviors that are private and high-stakes, such as reducing social contacts during a mortality surge.
+Similarly, gaps may narrow when the pandemic's toll is most visible and immediate, as concrete consequences constrain the space for motivated reasoning.
+These predictions allow us to test not only *whether* identity matters but *how* it operates differently across behavioral domains and temporal contexts.
+
+<!-- P3: Scope the contribution. -->
+
+We use data from the Berkeley Interpersonal Contact Study (BICS), a nationally representative survey that collected actual counts of daily interpersonal contacts and detailed mask usage during specific interactions across six waves from April 2020 to May 2021.
+These behavioral measures, concrete counts rather than abstract self-assessments, provide a more direct window into the behaviors most relevant to disease transmission.
+Our contribution is primarily descriptive: we do not claim to identify causal mechanisms, but we use the pattern of results across multiple contextual comparisons to constrain the set of plausible explanations for partisan behavioral divergence.

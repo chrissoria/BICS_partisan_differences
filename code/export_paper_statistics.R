@@ -123,7 +123,7 @@ demo_by_party <- bics_valid %>%
     pct_male = weighted.mean(male, w = weight_party_raked, na.rm = TRUE) * 100,
     pct_white = weighted.mean(white, w = weight_party_raked, na.rm = TRUE) * 100,
     pct_metro = weighted.mean(Metro, w = weight_party_raked, na.rm = TRUE) * 100,
-    pct_college = (weighted.mean(as.numeric(r_college_grad), w = weight_party_raked, na.rm = TRUE) - 1) * 100,
+    pct_college = weighted.mean(as.numeric(r_college_grad), w = weight_party_raked, na.rm = TRUE) * 100,
     pct_employed = weighted.mean(r_working_num, w = weight_party_raked, na.rm = TRUE) * 100,
     avg_hhsize = weighted.mean(resp_hhsize, w = weight_party_raked, na.rm = TRUE),
     .groups = "drop"
@@ -1892,6 +1892,359 @@ adj_gaps_by_state <- adj_behaviors_by_state %>%
 write_csv(adj_behaviors_by_state, here("out", "tables", "adj_behaviors_by_state.csv"))
 write_csv(adj_gaps_by_state, here("out", "tables", "adj_gaps_by_state.csv"))
 cat("  Adjusted state estimates exported to adj_behaviors_by_state.csv, adj_gaps_by_state.csv\n")
+
+# =============================================================================
+# 6e. CONTACT DECOMPOSITION & ROBUSTNESS MODELS (Appendix M)
+# =============================================================================
+# Decompose contacts into household vs. non-household components and run
+# outlier-robust models (negative binomial, quantile regression)
+
+cat("Calculating contact decomposition and robustness models...\n")
+
+# --- Contact decomposition by party and wave ---
+contact_decomp <- bics_valid %>%
+  filter(!is.na(num_cc), !is.na(num_cc_nonhh)) %>%
+  group_by(political_party, wave, data_collected_dates) %>%
+  summarise(
+    n = n(),
+    total_contacts = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    nonhh_contacts = weighted.mean(num_cc_nonhh, w = weight_party_raked, na.rm = TRUE),
+    hh_contacts = total_contacts - nonhh_contacts,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Democrat", "Independent", "Republican"))
+  ) %>%
+  arrange(wave, political_party)
+
+write_csv(contact_decomp, here("out", "tables", "contact_decomposition.csv"))
+cat("  Contact decomposition exported to contact_decomposition.csv\n")
+
+# --- Robustness models ---
+# Prepare data: reuse model_data (already filtered for complete cases at line ~1282)
+# Also need num_cc_nonhh to be non-missing
+model_data_robust <- model_data %>%
+  filter(!is.na(num_cc_nonhh))
+
+# 1. Negative binomial regression for non-household contacts
+library(MASS)
+
+nb_model <- tryCatch({
+  glm.nb(
+    round(num_cc_nonhh) ~ political_party + wave + age_group + r_race +
+      resp_hispanic + r_male + resp_educ + resp_hhsize +
+      CD_PERCENT_DEMOCRAT + log_prev_week_mort_rate,
+    data = model_data_robust
+  )
+}, error = function(e) {
+  cat("  Warning: Negative binomial model failed, falling back to Poisson\n")
+  glm(
+    round(num_cc_nonhh) ~ political_party + wave + age_group + r_race +
+      resp_hispanic + r_male + resp_educ + resp_hhsize +
+      CD_PERCENT_DEMOCRAT + log_prev_week_mort_rate,
+    data = model_data_robust,
+    family = poisson()
+  )
+})
+
+nb_coefs <- as.data.frame(summary(nb_model)$coefficients) %>%
+  rownames_to_column("term") %>%
+  filter(grepl("political_party", term)) %>%
+  mutate(
+    model = "Negative Binomial (non-HH contacts)",
+    estimate_exp = exp(Estimate),
+    ci_lower = exp(Estimate - 1.96 * `Std. Error`),
+    ci_upper = exp(Estimate + 1.96 * `Std. Error`)
+  )
+
+# 2. Negative binomial for TOTAL contacts (for comparison)
+nb_total_model <- tryCatch({
+  glm.nb(
+    round(num_cc) ~ political_party + wave + age_group + r_race +
+      resp_hispanic + r_male + resp_educ + resp_hhsize +
+      CD_PERCENT_DEMOCRAT + log_prev_week_mort_rate,
+    data = model_data_robust
+  )
+}, error = function(e) {
+  glm(
+    round(num_cc) ~ political_party + wave + age_group + r_race +
+      resp_hispanic + r_male + resp_educ + resp_hhsize +
+      CD_PERCENT_DEMOCRAT + log_prev_week_mort_rate,
+    data = model_data_robust,
+    family = poisson()
+  )
+})
+
+nb_total_coefs <- as.data.frame(summary(nb_total_model)$coefficients) %>%
+  rownames_to_column("term") %>%
+  filter(grepl("political_party", term)) %>%
+  mutate(
+    model = "Negative Binomial (total contacts)",
+    estimate_exp = exp(Estimate),
+    ci_lower = exp(Estimate - 1.96 * `Std. Error`),
+    ci_upper = exp(Estimate + 1.96 * `Std. Error`)
+  )
+
+# 3. Quantile regressions for total contacts
+library(quantreg)
+
+qr_formula <- num_cc ~ political_party + wave + age_group + r_race +
+  resp_hispanic + r_male + resp_educ + resp_hhsize +
+  CD_PERCENT_DEMOCRAT + log_prev_week_mort_rate
+
+qr_results <- lapply(c(0.25, 0.50, 0.75), function(tau) {
+  qr_fit <- rq(qr_formula, tau = tau, data = model_data_robust)
+  qr_summ <- summary(qr_fit, se = "nid")
+  coef_df <- as.data.frame(qr_summ$coefficients) %>%
+    rownames_to_column("term") %>%
+    filter(grepl("political_party", term))
+  coef_df$model <- paste0("Quantile Regression (tau=", tau, ")")
+  coef_df$tau <- tau
+  # Standardize column names
+  names(coef_df)[names(coef_df) == "Value"] <- "Estimate"
+  names(coef_df)[names(coef_df) == "Std. Error"] <- "SE"
+  names(coef_df)[names(coef_df) == "t value"] <- "t_value"
+  names(coef_df)[names(coef_df) == "Pr(>|t|)"] <- "p_value"
+  coef_df$ci_lower <- coef_df$Estimate - 1.96 * coef_df$SE
+  coef_df$ci_upper <- coef_df$Estimate + 1.96 * coef_df$SE
+  coef_df
+})
+qr_all <- bind_rows(qr_results)
+
+# 4. OLS for non-household contacts (comparison)
+ols_nonhh <- lm(
+  num_cc_nonhh ~ political_party + wave + age_group + r_race +
+    resp_hispanic + r_male + resp_educ + resp_hhsize +
+    CD_PERCENT_DEMOCRAT + log_prev_week_mort_rate,
+  data = model_data_robust,
+  weights = weight_party_raked
+)
+
+ols_nonhh_coefs <- as.data.frame(summary(ols_nonhh)$coefficients) %>%
+  rownames_to_column("term") %>%
+  filter(grepl("political_party", term)) %>%
+  mutate(
+    model = "OLS (non-HH contacts, weighted)"
+  )
+
+# Combine all robustness results
+robustness_results <- bind_rows(
+  nb_coefs %>% dplyr::select(term, model, Estimate, `Std. Error`,
+                              estimate_exp, ci_lower, ci_upper),
+  nb_total_coefs %>% dplyr::select(term, model, Estimate, `Std. Error`,
+                                    estimate_exp, ci_lower, ci_upper),
+  qr_all %>% dplyr::select(term, model, Estimate, SE, ci_lower, ci_upper, tau) %>%
+    rename(`Std. Error` = SE),
+  ols_nonhh_coefs %>% dplyr::select(term, model, Estimate, `Std. Error`) %>%
+    mutate(ci_lower = Estimate - 1.96 * `Std. Error`,
+           ci_upper = Estimate + 1.96 * `Std. Error`)
+)
+
+write_csv(robustness_results, here("out", "tables", "contact_robustness_models.csv"))
+cat("  Robustness models exported to contact_robustness_models.csv\n")
+
+# 5. Restricted sample: respondents with 2+ non-household contacts
+# Tests whether gap persists when excluding low-contact respondents
+model_data_2plus <- model_data_robust %>%
+  filter(num_cc_nonhh >= 2)
+
+ols_2plus <- lm(
+  num_cc_nonhh ~ political_party + wave + age_group + r_race +
+    resp_hispanic + r_male + resp_educ + resp_hhsize +
+    CD_PERCENT_DEMOCRAT + log_prev_week_mort_rate,
+  data = model_data_2plus,
+  weights = weight_party_raked
+)
+
+ols_2plus_coefs <- as.data.frame(summary(ols_2plus)$coefficients) %>%
+  rownames_to_column("term") %>%
+  filter(grepl("political_party", term)) %>%
+  mutate(
+    model = "OLS 2+ non-HH contacts (weighted)",
+    ci_lower = Estimate - 1.96 * `Std. Error`,
+    ci_upper = Estimate + 1.96 * `Std. Error`
+  )
+
+# Mask-usage OLS in 2+ non-HH sample
+ols_mask_2plus <- lm(
+  Norm_Masks_Used ~ political_party + wave + age_group + r_race +
+    resp_hispanic + r_male + resp_educ + resp_hhsize +
+    CD_PERCENT_DEMOCRAT + log_prev_week_mort_rate,
+  data = model_data_2plus,
+  weights = weight_party_raked
+)
+
+ols_mask_2plus_coefs <- as.data.frame(summary(ols_mask_2plus)$coefficients) %>%
+  rownames_to_column("term") %>%
+  filter(grepl("political_party", term)) %>%
+  mutate(
+    model = "OLS mask usage 2+ non-HH (weighted)",
+    ci_lower = Estimate - 1.96 * `Std. Error`,
+    ci_upper = Estimate + 1.96 * `Std. Error`
+  )
+
+# Also compute descriptive means for 2+ sample (contacts + masks)
+decomp_2plus <- bics_valid %>%
+  filter(!is.na(num_cc), !is.na(num_cc_nonhh), num_cc_nonhh >= 2) %>%
+  group_by(political_party, wave, data_collected_dates) %>%
+  summarise(
+    n = n(),
+    total_contacts = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    nonhh_contacts = weighted.mean(num_cc_nonhh, w = weight_party_raked, na.rm = TRUE),
+    hh_contacts = total_contacts - nonhh_contacts,
+    mask_usage = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    political_party = factor(political_party, levels = c("Democrat", "Independent", "Republican"))
+  ) %>%
+  arrange(wave, political_party)
+
+write_csv(decomp_2plus, here("out", "tables", "contact_decomposition_2plus.csv"))
+write_csv(ols_2plus_coefs, here("out", "tables", "contact_robustness_2plus.csv"))
+write_csv(ols_mask_2plus_coefs, here("out", "tables", "mask_robustness_2plus.csv"))
+cat("  Restricted sample (2+ non-HH) exported to contact_decomposition_2plus.csv, contact_robustness_2plus.csv, mask_robustness_2plus.csv\n")
+cat(sprintf("  N in 2+ non-HH sample: %d (%.1f%% of full model sample)\n",
+            nrow(model_data_2plus), 100 * nrow(model_data_2plus) / nrow(model_data_robust)))
+
+# =============================================================================
+# 6h. BEHAVIORS BY CITY AND PARTY
+# =============================================================================
+
+cat("Calculating behaviors by city and party...\n")
+
+behaviors_by_city <- bics_valid %>%
+  filter(!is.na(city)) %>%
+  group_by(city, political_party) %>%
+  summarise(
+    n = n(),
+    contacts_mean = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    contacts_se = sqrt(sum(weight_party_raked^2 * (num_cc - weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE))^2, na.rm = TRUE)) /
+                  sum(weight_party_raked, na.rm = TRUE),
+    mask_mean = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    mask_se = sqrt(sum(weight_party_raked^2 * (Norm_Masks_Used - weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE))^2, na.rm = TRUE)) /
+              sum(weight_party_raked, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+write_csv(behaviors_by_city, here("out", "tables", "behaviors_by_city.csv"))
+cat("  Behaviors by city exported to behaviors_by_city.csv\n")
+
+# =============================================================================
+# 6i. BEHAVIORS BY OPPOSING-PARTY CD AND PARTY
+# =============================================================================
+
+cat("Calculating behaviors by opposing-party CD and party...\n")
+
+behaviors_by_opposing_cd <- bics_valid %>%
+  filter(!is.na(In_Opposing_Party_CD)) %>%
+  mutate(opposing_cd = ifelse(In_Opposing_Party_CD == 1, "Opposing-party CD", "Same-party CD")) %>%
+  group_by(opposing_cd, political_party) %>%
+  summarise(
+    n = n(),
+    contacts_mean = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    contacts_se = sqrt(sum(weight_party_raked^2 * (num_cc - weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE))^2, na.rm = TRUE)) /
+                  sum(weight_party_raked, na.rm = TRUE),
+    mask_mean = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    mask_se = sqrt(sum(weight_party_raked^2 * (Norm_Masks_Used - weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE))^2, na.rm = TRUE)) /
+              sum(weight_party_raked, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+write_csv(behaviors_by_opposing_cd, here("out", "tables", "behaviors_by_opposing_cd.csv"))
+cat("  Behaviors by opposing-party CD exported to behaviors_by_opposing_cd.csv\n")
+
+# =============================================================================
+# 6j. BEHAVIORS BY DEMOGRAPHIC/SES CATEGORIES AND PARTY
+# =============================================================================
+
+cat("Calculating behaviors by demographic/SES categories and party...\n")
+
+# Helper function for grouped behavior summaries
+calc_behaviors_by_group <- function(data, group_var, group_label) {
+  data %>%
+    filter(!is.na(.data[[group_var]])) %>%
+    group_by(context = .data[[group_var]], political_party) %>%
+    summarise(
+      n = n(),
+      contacts_mean = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+      mask_mean = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(section = group_label, context = as.character(context))
+}
+
+# Age group
+behaviors_by_age <- calc_behaviors_by_group(bics_valid, "age_group", "Age Group")
+
+# Race
+behaviors_by_race <- calc_behaviors_by_group(bics_valid, "r_race", "Race")
+
+# Hispanic ethnicity
+behaviors_by_hispanic <- calc_behaviors_by_group(bics_valid, "resp_hispanic", "Hispanic Ethnicity")
+
+# Gender
+behaviors_by_gender <- bics_valid %>%
+  filter(!is.na(r_male)) %>%
+  mutate(gender = ifelse(r_male == 1, "Male", "Female")) %>%
+  group_by(context = gender, political_party) %>%
+  summarise(
+    n = n(),
+    contacts_mean = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    mask_mean = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(section = "Gender")
+
+# Education
+behaviors_by_education <- calc_behaviors_by_group(bics_valid, "resp_educ", "Education")
+
+# Employment status
+behaviors_by_employment <- calc_behaviors_by_group(bics_valid, "r_working", "Employment Status")
+
+# Household size (binned)
+behaviors_by_hhsize <- bics_valid %>%
+  filter(!is.na(resp_hhsize)) %>%
+  mutate(hhsize_cat = case_when(
+    resp_hhsize <= 1 ~ "1 (Lives alone)",
+    resp_hhsize == 2 ~ "2",
+    resp_hhsize == 3 ~ "3",
+    resp_hhsize >= 4 ~ "4+"
+  )) %>%
+  mutate(hhsize_cat = factor(hhsize_cat, levels = c("1 (Lives alone)", "2", "3", "4+"))) %>%
+  group_by(context = hhsize_cat, political_party) %>%
+  summarise(
+    n = n(),
+    contacts_mean = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    mask_mean = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(section = "Household Size", context = as.character(context))
+
+# Income (excluding prefer not to answer)
+behaviors_by_income <- bics_valid %>%
+  filter(!is.na(Income_Category), Income_Category != "Prefer not to answer") %>%
+  mutate(Income_Category = factor(Income_Category, levels = c(
+    "Less than $30,000", "$30,000 to $59,999", "$60,000 to $89,999", "$90,000 to $199,999"
+  ))) %>%
+  group_by(context = Income_Category, political_party) %>%
+  summarise(
+    n = n(),
+    contacts_mean = weighted.mean(num_cc, w = weight_party_raked, na.rm = TRUE),
+    mask_mean = weighted.mean(Norm_Masks_Used, w = weight_party_raked, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(section = "Household Income", context = as.character(context))
+
+# Combine all demographic breakdowns
+behaviors_by_demographics <- bind_rows(
+  behaviors_by_age, behaviors_by_race, behaviors_by_hispanic,
+  behaviors_by_gender, behaviors_by_education, behaviors_by_employment,
+  behaviors_by_hhsize, behaviors_by_income
+)
+
+write_csv(behaviors_by_demographics, here("out", "tables", "behaviors_by_demographics.csv"))
+cat("  Behaviors by demographics exported to behaviors_by_demographics.csv\n")
 
 # =============================================================================
 # 7. SAVE OUTPUT
