@@ -23,21 +23,13 @@ paper_stats <- readRDS(stats_path)
 list2env(paper_stats, envir = environment())
 ```
 
-<!-- JHSB outline: ~12 paragraphs of continuous prose, no subsection headers.
-Arc: roadmap → establish gaps → perception setup → perception test → interaction models →
-temporal variation → contacts-vs-masks divergence → attitude-behavior disconnect →
-regional context → policy/robustness → elimination summary → portable polarization.
-Every paragraph has one job. Lead with the verdict, then show the evidence. -->
+We proceed by testing each competing explanation against the empirical patterns, retaining the explanation that survives all tests.
 
-We structure our results as a series of tests designed to adjudicate between the competing theoretical explanations outlined above.
-We first establish that partisan differences in health behaviors are substantial and survive demographic controls.
-We then test whether gaps in risk perception can account for behavioral differences, whether objective pandemic severity overrides partisan identity when the stakes are highest, and whether geographic context, policy environments, or local partisan composition can explain the gaps.
-Each test confronts a specific theory with the empirical patterns; the explanation that survives all tests is the one we retain.
-
-We find substantial partisan differences across all three health behaviors examined (@fig-partisan-behaviors).
+We find substantial partisan differences in social contacts and mask-wearing, as well as in a descriptive assessment of vaccine acceptance (@fig-partisan-behaviors).
 Republicans reported `r sprintf("%.1f", contacts_rep)` total daily contacts compared to `r sprintf("%.1f", contacts_dem)` for Democrats (a gap of `r sprintf("%.1f", contacts_gap)` contacts per day), wore masks during just `r sprintf("%.1f", mask_rep)`% of contacts compared to `r sprintf("%.1f", mask_dem)`% for Democrats (a gap of `r sprintf("%.0f", mask_gap)` percentage points), and showed lower vaccine acceptance (`r sprintf("%.1f", vax_rep)`% vs. `r sprintf("%.1f", vax_dem)`%; see @sec-vaccine-appendix).
-These differences persisted after controlling for age, gender, race, education, and urban/rural residence, eliminating the possibility that partisan gaps are artifacts of demographic sorting — the first competing explanation.
-The partisan gap in mask-wearing was larger than differences observed across other demographic categories including race, gender, and education.
+These differences persisted after controlling for age, gender, race, education, and urban/rural residence, eliminating the possibility that partisan gaps are artifacts of demographic sorting, the first competing explanation.
+The partisan gap in mask-wearing was larger than differences observed across other demographic categories including race, gender, and education (see @tbl-behavior-levels-demo for behavior levels by demographic subgroup).
+Detailed contact rates and mask usage levels by partisan group across survey waves, regions, policy environments, and demographic subgroups are reported in @sec-behavior-levels-table.
 Importantly, these gaps are not driven by respondents with minimal out-of-household activity: restricting the sample to those reporting two or more non-household contacts yields comparable partisan differences in both contacts and mask usage (see @sec-2plus-nonhh).
 Because vaccination was assessed only in Wave 6 and cannot be examined longitudinally, the analyses that follow focus on contacts and mask-wearing.
 
@@ -85,10 +77,10 @@ ggplot(behavior_data, aes(x = party, y = value, fill = party)) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.15)))
 ```
 
-Underlying these behavioral differences were substantial partisan gaps in pandemic risk perception (see @sec-perception-appendix): `r sprintf("%.0f", concern_dem)`% of Democrats reported being "very concerned" about COVID-19 compared to `r sprintf("%.0f", concern_rep)`% of Republicans — a `r sprintf("%.0f", concern_gap)` percentage point gap documented extensively in prior work [@gadarian_partisanship_2021; @milosh_unmasking_2021; @kaushal_american_2022].
+Underlying these behavioral differences were substantial partisan gaps in pandemic risk perception (see @sec-perception-appendix): `r sprintf("%.0f", concern_dem)`% of Democrats reported being "very concerned" about COVID-19 compared to `r sprintf("%.0f", concern_rep)`% of Republicans, a `r sprintf("%.0f", concern_gap)` percentage point gap documented extensively in prior work [@gadarian_partisanship_2021; @milosh_unmasking_2021; @kaushal_american_2022].
 If these perception differences fully account for the behavioral gaps, then partisans who express the same level of concern should behave similarly.
 @fig-concern-gaps tests this directly by comparing the Republican-Democrat gap within each level of stated concern (see @sec-perception-appendix for levels by party).
-For social contacts, the partisan gap persists at every level: among the very concerned, Republicans still reported `r sprintf("%.1f", contacts_vc_rep)` daily contacts compared to `r sprintf("%.1f", contacts_vc_dem)` for Democrats, a gap of `r sprintf("%.1f", contacts_vc_gap)` contacts.
+For social contacts, the partisan gap persists at every level: among the very concerned, Republicans still reported `r sprintf("%.1f", contacts_vc_rep)` daily contacts compared to `r sprintf("%.1f", contacts_vc_dem)` for Democrats.
 For mask usage, perceived severity does mitigate polarization: the gap narrows as concern increases, and among the "very concerned," Republicans and Democrats report nearly identical mask usage (`r sprintf("%.0f", mask_vc_rep)`% vs. `r sprintf("%.0f", mask_vc_dem)`%).
 
 ```{r}
@@ -151,20 +143,21 @@ p_contact_gap + p_mask_gap
 ```
 
 Interaction models formally confirm these patterns (see @sec-interaction-models).
-For contacts, the Republican x Very Concerned interaction is statistically significant and negative ($\beta$ = `r sprintf("%.2f", contact_int_concern)`, p = `r sprintf("%.2f", contact_int_concern_p)`), indicating that concern modestly narrows the partisan contact gap — but does not close it.
+For contacts, the Republican x Very Concerned interaction is statistically significant and negative ($\beta$ = `r sprintf("%.2f", contact_int_concern)`, p = `r sprintf("%.2f", contact_int_concern_p)`), indicating that concern modestly narrows the partisan contact gap but does not close it.
 For masks, the interaction is large and significant ($\beta$ = `r sprintf("%.1f", mask_int_concern)`, p < 0.001).
 The mechanism is clear: among the very concerned, Republicans wore masks during `r sprintf("%.0f", mask_veryconcerned_rep)`% of contacts, nearly identical to Democrats (`r sprintf("%.0f", mask_veryconcerned_dem)`%).
 But this convergence reflects Republicans responding more sharply to concern: Republicans increased mask usage by `r sprintf("%.0f", mask_slope_rep)` percentage points from "not at all concerned" to "very concerned," compared to `r sprintf("%.0f", mask_slope_dem)` points for Democrats.
 In sum, perceived severity mitigates partisan polarization for both behaviors, though the effect is substantially larger for mask usage than for social contacts.
-These results weigh against the information and perception explanation as a complete account: if partisan behavioral differences were simply downstream of different risk perceptions, they should disappear among partisans who express the same level of concern.
-They do not — particularly for contacts, where the gap persists at every concern level.
+These results weigh against the perception explanation as a complete account: if partisan behavioral differences were simply downstream of different risk perceptions, they should disappear among partisans who express the same level of concern.
+They do not, particularly for contacts, where the gap persists at every concern level.
 Perception matters, but it is insufficient on its own to explain partisan behavioral divergence.
 
 These aggregate gaps were not constant over time.
 @fig-partisan-gaps tracks partisan gaps across survey waves alongside local mortality rates.
-The contact gap was smallest during high-mortality periods — early in the pandemic and during the winter 2020-21 surge (gaps of 0.3-0.7 contacts) — and largest when mortality was low (3.5 contacts in September 2020).
+The contact gap was smallest during high-mortality periods, early in the pandemic and during the winter 2020-21 surge (gaps of 0.3-0.7 contacts), and largest when mortality was low (3.5 contacts in September 2020).
 Regression models confirm that Republicans were more responsive to mortality than Democrats, reducing contacts more sharply when deaths rose (see @sec-pandemic-response-detail for detailed coefficients).
 The mask gap, by contrast, grew steadily from 6 to 15 percentage points regardless of mortality, showing no convergence during the winter surge.
+This widening may appear to conflict with the pooled finding that very concerned Republicans and Democrats masked at similar rates, but the two patterns are consistent: the pooled convergence among the very concerned is driven heavily by early waves, and over time the share of Republicans reporting high concern declined steadily, so the population-level mask gap widened even as the within-concern-level gap remained modest (see @sec-perception-appendix for wave-level breakdowns).
 
 ```{r}
 #| label: load-wave-data-perceptions
@@ -252,8 +245,8 @@ p_contact_gap + p_mask_gap +
 ```
 
 This divergence between contacts and masks offers a partial verdict on the "objective severity overrides identity" explanation.
-Objective severity can temporarily compress partisan gaps for contacts — a private, high-stakes behavior where the personal consequences of not reducing exposure are immediate and concrete — but it does not override identity for mask-wearing, a visible, low-cost behavior that had become an entrenched marker of partisan identity.
-The most telling evidence comes from the winter 2020-21 surge: Republicans reduced their contacts substantially, converging toward Democratic levels, yet simultaneously reported their *lowest* levels of concern across all waves — attitudes polarized while behavior converged.
+Objective severity can temporarily compress partisan gaps for contacts, a private, high-stakes behavior where the personal consequences of not reducing exposure are immediate, but it does not override identity for mask-wearing, a visible, low-cost behavior that had become an entrenched marker of partisan identity.
+The most telling evidence comes from the winter 2020-21 surge: Republicans reduced their contacts substantially, converging toward Democratic levels, yet simultaneously reported their *lowest* levels of concern across all waves. Attitudes polarized while behavior converged.
 This disconnect suggests that expressed attitudes had become performative markers of group allegiance rather than genuine guides to behavior (see @sec-perception-vs-local for detailed analysis).
 Neither perception nor severity can fully account for the partisan behavioral divide.
 
@@ -346,9 +339,10 @@ If partisan gaps reflect regional culture or adaptation to local norms, they sho
 Partisan gaps persist in every region, though with notable variation: the contact gap ranged from `r sprintf("%.1f", smallest_contact_gap_region$contacts_gap_rd)` contacts in the `r smallest_contact_gap_region$census_region` to `r sprintf("%.1f", largest_contact_gap_region$contacts_gap_rd)` in the `r largest_contact_gap_region$census_region`; the mask gap from `r sprintf("%.1f", smallest_mask_gap_region$mask_gap_dr)` percentage points in the `r smallest_mask_gap_region$census_region` to `r sprintf("%.1f", largest_mask_gap_region$mask_gap_dr)` in the `r largest_mask_gap_region$census_region`.
 Importantly, where gaps are smaller, as in the South, this reflects Democrats behaving less cautiously (`r sprintf("%.1f", dem_south_contacts)` contacts vs. `r sprintf("%.1f", dem_other_contacts)` elsewhere), not Republicans becoming more cautious (see @sec-spatial-variation for detailed breakdowns and @sec-behavior-levels-table for comprehensive behavior levels by party across demographic and contextual subgroups).
 Context shifts absolute levels of behavior but does not close the partisan gap.
+City-level comparisons tell the same story: partisan gaps in both contacts and mask usage appear in every BICS sample city (see @sec-city-gaps).
 
 These geographic patterns are robust to alternative contextual explanations.
-Partisan gaps persisted within each mask mandate regime — strict, less strict, and no mandate — eliminating the "it's just policy" explanation (see @sec-policy-behaviors).
+Partisan gaps persisted within each mask mandate regime (strict, less strict, and no mandate), eliminating the "it's just policy" explanation (see @sec-policy-behaviors).
 Gaps remained stable after adjusting for urbanicity and demographics (see @sec-context-demographics-robustness).
 Supplementary analyses of partisans living in opposing-party congressional districts tell a consistent story: while partisans adjust modestly toward local norms, the gap persists in both same-party and cross-party contexts (@sec-cd-context-robustness).
 These findings eliminate the remaining competing explanations: partisan gaps do not disappear among people living under the same mandates, in the same regions, or among members of the opposing party.
@@ -400,11 +394,11 @@ p_contact_map / p_mask_map
 Taken together, we can assess the scorecard of competing explanations.
 Demographic composition does not account for partisan gaps: they persist after controlling for age, gender, race, education, and urbanicity.
 Information and risk perception offer a partial account for mask-wearing but fail for contacts, where gaps remain at every level of stated concern.
-Objective severity temporarily compresses contact gaps during mortality surges but leaves mask polarization untouched — and the disconnect between stated concern and behavior during the winter surge undermines the premise that perceptions faithfully guide action.
+Objective severity temporarily compresses contact gaps during mortality surges but leaves mask polarization untouched, and the disconnect between stated concern and behavior during the winter surge undermines the premise that perceptions faithfully guide action.
 Policy environments do not explain the gaps: they persist within strict, lenient, and no-mandate areas alike.
 Regional culture shifts absolute levels of behavior but does not close the partisan divide, and even partisans living among members of the opposing party maintain behavioral differences.
 
-The surviving explanation is that partisan identity itself drives behavioral polarization — what we term "portable polarization."
+The surviving explanation is that partisan identity is itself associated with behavioral polarization, what we term "portable polarization."
 Partisans carry their behavioral patterns with them across diverse environments, even as they adjust modestly toward local norms.
-Each competing factor matters at the margins — perception narrows the mask gap among the very concerned, mortality temporarily compresses the contact gap, and regional context shifts absolute levels — but none eliminates the fundamental partisan divide.
+Each competing factor matters at the margins: perception narrows the mask gap among the very concerned, mortality temporarily compresses the contact gap, and regional context shifts absolute levels. But none eliminates the fundamental partisan divide.
 The gaps are not artifacts of Republicans and Democrats sorting into different environments; they are features of partisan identity itself.

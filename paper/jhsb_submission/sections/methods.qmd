@@ -8,19 +8,11 @@ editor:
 
 ## Data
 
-<!-- P1: Source + design + sample.
-Name the survey, funder, who administered it, sampling frame. State full N →
-analytic N with reason for any restriction. -->
-
-We use data from the Berkeley Interpersonal Contact Study (BICS), a nationally representative survey that collected detailed information on social contact patterns, protective behaviors, and demographic characteristics during the COVID-19 pandemic in the United States.
+The Berkeley Interpersonal Contact Study (BICS), a nationally representative survey that collected detailed information on social contact patterns, protective behaviors, and demographic characteristics during the COVID-19 pandemic in the United States.
 BICS recruited respondents from an online panel and used weighting methods to generate nationally representative estimates.
 Respondents were asked how many people they had face-to-face contact with on the day before the survey interview, and detailed information was collected on up to three of these contacts, including each contact's age, sex, race/ethnicity, mask usage, and physical distance.
 We analyze waves 1 through 6, spanning April 2020 to May 2021 (N = 18,233).
-Wave 0 is omitted because it did not record political affiliation in a comparable way.
 Additional details on survey methodology, questionnaire design, sampling, and weighting are described in @feehan_quantifying_2021.
-
-<!-- P2: Representativeness.
-Compare sample to national benchmarks. Acknowledge deviations. -->
 
 \newpage
 
@@ -94,16 +86,12 @@ The three partisan groups differed on several demographic characteristics (@tbl-
 Republicans were older on average and more likely to be male.
 The most striking demographic difference was in racial composition: 85% of Republicans identified as white, compared to 71% of Independents and 60% of Democrats.
 Democrats were more likely to live in metropolitan areas and to hold a college degree.
-Our analytic sample overrepresents Democrats (44.9%) relative to national estimates of party identification during the study period — 30% Democrat, 29% Republican, and 39% Independent [@gallup_party_2021] — while underrepresenting Independents (24.8% vs. 39%).
+Our analytic sample overrepresents Democrats (44.9%) relative to national estimates of party identification during the study period (30% Democrat, 29% Republican, and 39% Independent; @gallup_party_2021) while underrepresenting Independents (24.8% vs. 39%).
 Republicans are represented at roughly their national share (30.3% vs. 29%).
-
-<!-- P3: Weighting + missing data strategy. -->
 
 Survey weights are applied throughout to improve representativeness.
 These weights adjust for age, gender, race/ethnicity, and education, and we additionally rake on party identification to match national targets.
 Because partisanship is highly correlated with these demographic characteristics, the party-adjusted weights produce estimates nearly identical to the original demographic weights for within-party comparisons (see @sec-weight-sensitivity).
-
-<!-- P4: Survey design details. -->
 
 Political party identification was assessed by the panel provider prior to the survey.
 Upon enrollment in the panel, respondents selected their partisan affiliation from standard categories (Democrat, Republican, Independent, or Prefer not to Say/Other).
@@ -111,22 +99,16 @@ We exclude respondents in the "Prefer not to Say/Other" category to prevent pote
 Because party identification was collected independently of our survey instrument and before the pandemic began for most respondents, it is not subject to priming effects from our health behavior questions.
 Party identification is among the most stable of political attitudes, typically formed in early adulthood and maintained across the life course [@green_partisan_2002], making it unlikely that respondents' partisan identification changed meaningfully between the panel provider's measurement and our survey.
 
-<!-- P5: Data limitations. -->
-
 Several features of the data warrant consideration.
 The sample is drawn from an online panel, which may underrepresent populations with limited internet access.
-Self-reported behavioral measures are subject to social desirability bias and recall error, though the specificity of our measures — actual contact counts for the previous day, mask usage during specific interactions — reduces the scope for such bias relative to abstract attitudinal items.
+Self-reported behavioral measures are subject to social desirability bias and recall error, though the specificity of our measures (actual contact counts for the previous day, mask usage during specific interactions) reduces the scope for such bias relative to abstract attitudinal items.
 Our assessment of vaccine acceptance is limited to a single wave (May 2021), early in the rollout when eligibility and supply varied across jurisdictions.
 
 ## Measures
 
 ### Dependent Variables
 
-<!-- P1: Introduce what's measured. -->
-
 We examine two primary health behaviors measured across all six survey waves, plus vaccination assessed in a single wave.
-
-<!-- P2: List specific items. -->
 
 **Social Contacts.**
 Our primary contact measure is the total number of face-to-face contacts respondents reported for the day prior to the survey interview.
@@ -137,9 +119,7 @@ We also examine non-household contacts as a supplementary measure that isolates 
 Mask usage is derived from the contact-level alter roster.
 For each of up to three non-household contacts, respondents indicated whether a face mask was worn during the interaction.
 We aggregate these reports to construct a respondent-level measure equal to the percentage of non-household contacts during which the respondent wore a mask (0-100 scale).
-This measure captures actual masking behavior during specific interactions rather than general attitudes toward masks.
-
-<!-- P3: Coding + validation. -->
+This measure captures reported masking behavior during specific recalled interactions rather than general attitudes toward masks, though it remains subject to recall bias: respondents may be more likely to report contacts that are salient or emotionally close [@marin_are_2004], and we cannot observe actual masking behavior directly.
 
 **Vaccination.**
 Vaccine acceptance, measured in Wave 6 (May 2021) only, is a binary indicator equal to one if the respondent was already vaccinated or stated an intention to vaccinate.
@@ -148,56 +128,44 @@ Because it was assessed in a single wave, vaccine acceptance is reported descrip
 ### Key Independent Variable
 
 Party identification is our primary independent variable.
-Respondents were classified as Democrats, Republicans, or Independents based on their self-reported affiliation, collected by the panel provider prior to our survey.
+This is a subjective measure: respondents simply indicated which political party they identify with.
+Respondents were classified as Democrats, Republicans, or Independents based on this self-reported affiliation, collected by the panel provider prior to our survey.
 Democrats serve as the reference category in all regression models.
 
 ### Control Variables
 
-<!-- Front-load the most theoretically relevant control. -->
-
-Local pandemic severity — measured as lagged county-level COVID-19 incidence and mortality rates — is the most theoretically consequential control, as it captures the objective risk environment to which partisans may differentially respond.
+Local pandemic severity, measured as lagged county-level COVID-19 incidence and mortality rates, is the most theoretically consequential control, as it captures the objective risk environment to which partisans may differentially respond.
 We link individual survey responses to geographic data at the ZIP code and congressional district levels to characterize local partisan composition (2020 U.S. House election vote share) and policy environment (county-level mask mandate status, classified as strict, less strict, unspecified, or no mandate).
 Additional demographic controls include age, gender, race/ethnicity, education, income, and urban/rural residence.
 These variables are included to test whether partisan gaps reflect demographic sorting rather than the independent effect of identity (see @sec-context-demographics-robustness for detailed results).
 
 ## Analytical Strategy
 
-<!-- P1: Roadmap. -->
-
 The analysis proceeds in three stages.
 First, we establish partisan differences in health behaviors and test whether they survive demographic controls.
 Second, we examine whether risk perception and objective pandemic severity can account for the gaps.
-Third, we test whether gaps persist across geographic, policy, and partisan contexts — the central test of "portable polarization."
+Third, we test whether gaps persist across geographic, policy, and partisan contexts, the central test of "portable polarization."
 
-<!-- P2: Justify the method. -->
-
-Our empirical strategy is organized around the competing theoretical explanations outlined in the Background.
-Each explanation predicts that partisan gaps should narrow or disappear under specific conditions; we test each by examining whether gaps persist where that theory predicts they should not.
+Our empirical strategy is organized around the competing explanations outlined in the Background.
+Each explanation predicts that partisan gaps should narrow or disappear under specific conditions; we test each by examining whether gaps persist where that explanation predicts they should not.
 This pattern-based approach allows us to constrain the set of plausible explanations even though we cannot directly identify causal mechanisms with observational data.
-
-<!-- P3: Formal specification. -->
 
 To examine whether partisans differentially respond to changes in pandemic severity, we estimate models interacting party identification with lagged local conditions:
 
 $$
-Y_{ict} = \beta_1 \text{Party}_i + \beta_2 \log(\text{Incidence}_{c,t-1}) + \beta_3 (\text{Party}_i \times \log(\text{Incidence}_{c,t-1})) + \gamma_c + \mathbf{X}_i'\delta + \epsilon_{ict}
+Y_{ict} = \beta_1 \text{Party}_i + \beta_2 \log(\text{Incidence}_{c,t-1}) + \beta_3 (\text{Party}_i \times \log(\text{Incidence}_{c,t-1})) + \gamma_t + \mathbf{X}_i'\delta + \epsilon_{ict}
 $$
 
-where $Y_{ict}$ is the outcome for individual $i$ in county $c$ at time $t$, $\text{Party}_i$ indicates partisan affiliation (Democrats as reference), $\log(\text{Incidence}_{c,t-1})$ is the log-transformed county-level incidence rate during the week prior to the survey, $\gamma_c$ represents county fixed effects, and $\mathbf{X}_i$ includes individual-level controls.
+where $Y_{ict}$ is the outcome for individual $i$ in county $c$ at time $t$, $\text{Party}_i$ indicates partisan affiliation (Democrats as reference), $\log(\text{Incidence}_{c,t-1})$ is the log-transformed county-level incidence rate during the week prior to the survey, $\gamma_t$ represents wave fixed effects, and $\mathbf{X}_i$ includes individual-level controls.
 We estimate parallel models substituting mortality for incidence.
 Both predictors are standardized (z-score) to facilitate comparison.
-
-<!-- P4: Model for RQ1 — robustness of partisan gaps. -->
+In supplementary analyses, we substitute county fixed effects ($\gamma_c$) to isolate within-county temporal variation from all time-invariant county characteristics (see @sec-interaction-models).
 
 For the first research question, we estimate weighted means and regression-adjusted comparisons of health behaviors by party, controlling for demographics.
-We then stratify by concern level to test the information/perception explanation: if partisan gaps disappear among respondents reporting the same level of concern, the perception account is sufficient; if gaps persist, identity operates through channels beyond information processing.
+We then stratify by concern level to test the perception explanation: if partisan gaps disappear among respondents reporting the same level of concern, the perception account is sufficient; if gaps persist, identity may operate through channels beyond stated risk perception.
 
-<!-- P5: Model for RQ2 — conditions that amplify/attenuate gaps. -->
-
-For the second research question, the county fixed effects specification above tests whether partisan gaps narrow when objective severity rises.
-By absorbing all time-invariant county characteristics — local political culture, healthcare infrastructure, population density — the model isolates within-county temporal variation, asking: as conditions change within the same county, do partisans adjust their behavior differently?
+For the second research question, the wave fixed effects specification above tests whether partisan gaps narrow when objective severity rises, using within-wave cross-county variation in local conditions.
+Supplementary county fixed effects models absorb all time-invariant county characteristics, isolating within-county temporal variation to ask: as conditions change within the same county, do partisans adjust their behavior differently?
 We complement this with regional comparisons using estimated marginal means (emmeans) adjusted for survey wave and local mortality, and with stratification by policy environment and local partisan context.
-
-<!-- P6: Robustness. -->
 
 We assess robustness through weight sensitivity analyses comparing results under demographic-only versus party-raked weights (@sec-weight-sensitivity), and supplementary analyses of partisans living in opposing-party congressional districts (@sec-cd-context-robustness).

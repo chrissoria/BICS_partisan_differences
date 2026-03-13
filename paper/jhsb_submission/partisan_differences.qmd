@@ -1,12 +1,12 @@
 ---
-title: "Partisan Differences in Health Behaviors During the COVID-19 Pandemic"
-# Running head: Partisan Differences in Health Behaviors (41 characters)
+title: "Portable Polarization: Partisan Identity and Health Behavior During COVID-19"
+# Running head: Portable Polarization in Health Behavior (42 characters)
 # Word count: auto-calculated at render (see word-count chunk)
 # Tables: 1
 # Figures: 5
 date: today
 abstract: |
-  COVID-19 mortality diverged along partisan lines, yet whether individual partisans genuinely differed in health behavior or whether gaps reflect policy environments and geographic sorting remains contested. Existing work documents partisan attitudinal differences but cannot distinguish the independent role of partisan identity from contextual confounds. Using data from the Berkeley Interpersonal Contact Study, a nationally representative survey of 18,233 respondents across six waves (April 2020-May 2021), this study tests competing explanations for partisan gaps in daily social contacts and mask-wearing. Partisan differences persist within shared policy environments, across regions, and after demographic adjustment -- a pattern we term "portable polarization." Objective severity temporarily compresses contact gaps but leaves mask polarization untouched, and stated concern fails to account for behavioral differences, suggesting that expressed attitudes on politicized health topics may not reliably predict protective behavior. Partisan identity operates as an independent driver of health behavior, not reducible to information, policy, or place.
+  COVID-19 mortality diverged along partisan lines, yet whether individual partisans genuinely differed in health behavior remains contested. Using data from the Berkeley Interpersonal Contact Study (18,233 respondents, six waves, April 2020-May 2021), we test competing explanations for partisan gaps in social contacts and mask-wearing. Partisan differences persist within shared policy environments, across regions, and after demographic adjustment -- a pattern we term "portable polarization." The two behaviors diverge in revealing ways: rising mortality temporarily compressed the contact gap, a private, high-cost behavior, but left mask-wearing polarization untouched, consistent with visible behaviors functioning as identity markers rather than responses to risk. Stated concern fails to account for behavioral differences, suggesting that expressed attitudes on politicized topics may not reliably predict protective behavior. Partisan identity is independently associated with health behavior through channels not reducible to perception, policy, or place.
 keywords:
   - COVID-19
   - political polarization
@@ -143,9 +143,11 @@ message("═══════════════════════\n
 
 {{< include sections/discussion.qmd >}}
 
+\newpage
+
 # References
 
 ::: {#refs}
 :::
 
-<!-- {{< include sections/appendix.qmd >}} -->
+{{< include sections/appendix.qmd >}}

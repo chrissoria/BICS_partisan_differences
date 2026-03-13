@@ -4,18 +4,10 @@ editor:
     wrap: sentence
 ---
 
-<!-- JHSB: No "Introduction" heading — text begins with the full title repeated,
-or simply starts. Per outline:
-P1: Problem + stakes (1-2 sentences establishing the societal problem)
-P2: Literature → gap (what the field knows, then the conceptual failure)
-P3: This paper + theoretical positioning (what we do, why dominant approach is insufficient)
-P4: Findings preview + significance (give away the answer, state contribution)
--->
-
 The COVID-19 pandemic revealed a striking pattern in American public health: mortality rates diverged sharply along partisan lines.
 Counties that voted heavily for Donald Trump in 2020 experienced substantially higher COVID-19 death rates than those that supported Joe Biden [@gollwitzer_partisan_2020; @wallace_excess_2023].
-This partisan mortality divide was not a statistical artifact — it emerged during the pandemic and widened over time, particularly after vaccines became available [@wallace_excess_2023].
-Early in the pandemic, mortality was higher in Democratic-leaning counties, reflecting the initial concentration of cases in urban areas like New York City; but by fall 2020, this pattern reversed, and Republican-leaning counties experienced persistently higher mortality through the remainder of the pandemic (@fig-county-mortality).
+This partisan mortality divide was not a statistical artifact; it emerged during the pandemic and widened over time, particularly after vaccines became available [@wallace_excess_2023].
+Early in the pandemic, mortality was higher in Democratic-leaning counties, reflecting the initial concentration of cases in urban areas like New York City; but by fall 2020, this pattern reversed, and Republican-leaning counties experienced persistently higher mortality through the remainder of the pandemic [@gollwitzer_partisan_2020; @wallace_excess_2023; see @fig-county-mortality].
 
 ```{r}
 #| label: fig-county-mortality
@@ -113,13 +105,14 @@ These aggregate patterns raise the possibility that individual partisans differe
 But county-level data alone cannot tell us whether such individual-level differences exist, how large they are, or whether they persist once we account for the many other ways that Republican- and Democratic-leaning places differ.
 Survey research has documented substantial partisan gaps in pandemic-related attitudes, with Republicans expressing less concern about the virus and lower support for mitigation measures [@gadarian_partisanship_2021], and some studies have linked these attitudinal differences to downstream health consequences, finding that political orientation predicted self-rated health and well-being even after accounting for local pandemic severity [@coleman_hurt_2024].
 Yet this literature leaves critical questions unanswered: attitudinal studies capture what partisans *say* but not necessarily what they *do*, and analyses that link partisanship to health outcomes cannot isolate whether behavioral divergence or geographic sorting drives the association.
-Before we can explain *why* partisan identity shapes health behavior, we must first establish *whether* it does so robustly, independent of policy, place, and demography, and *under what conditions* partisan identity matters most.
+Some studies have begun to examine contextual moderation, notably @baxter-king_how_2022's finding that local partisan composition shaped mask-wearing asymmetrically across parties, but existing work has not tested multiple behaviors within the same sample across comparable policy, geographic, and demographic contexts.
+Before we can explain *why* partisan identity shapes health behavior, we must first establish *whether* it does so robustly across these dimensions, and *under what conditions* partisan identity matters most.
 
 This paper uses data from the Berkeley Interpersonal Contact Study (BICS), a nationally representative survey that collected detailed counts of daily interpersonal contacts and mask usage during the COVID-19 pandemic, to adjudicate between competing explanations for partisan health gaps.
 Rather than testing a single mechanism, we exploit variation across policy environments, demographic composition, geographic context, perceived severity, and pandemic conditions to ask: which theories survive contact with the empirical patterns?
-If partisan differences are artifacts of policy or place, they should dissolve within comparable environments; if they reflect demographic sorting, they should close after controlling for covariates; if information and perception fully drive behavior, they should disappear among partisans who assess risk similarly; and if objective severity overrides identity, they should narrow when mortality is highest.
+If partisan differences are artifacts of policy or place, they should dissolve within comparable environments; if they reflect demographic sorting, they should close after controlling for covariates; if perception fully drives behavior, they should disappear among partisans who assess risk similarly; and if objective severity overrides identity, they should narrow when mortality is highest.
 
 Our findings reveal that partisan differences in health behaviors are remarkably robust.
 Gaps in social contacts and mask-wearing persist within policy environments, across regions, in both urban and rural areas, and across diverse local partisan compositions, a pattern we term "portable polarization."
 At the same time, the magnitude of polarization varies in theoretically revealing ways: objective severity temporarily compresses contact gaps but leaves mask-wearing polarization untouched, and stated concern fails to account for behavioral differences, suggesting that expressed attitudes on politicized health topics may function as markers of group allegiance rather than guides to behavior.
-These findings advance sociological understanding of how partisan identity, increasingly a master status in American life, shapes health behavior through channels that operate independently of information, policy, and place.
+These findings advance sociological understanding of how partisan identity, increasingly a master status in American life [@mason_uncivil_2018], shapes health behavior through channels that operate independently of perception, policy, and place.
