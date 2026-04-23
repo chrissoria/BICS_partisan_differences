@@ -92,6 +92,8 @@ Republicans are represented at roughly their national share (30.3% vs. 29%).
 Survey weights are applied throughout to improve representativeness.
 These weights adjust for age, gender, race/ethnicity, and education, and we additionally rake on party identification to match national targets.
 Because partisanship is highly correlated with these demographic characteristics, the party-adjusted weights produce estimates nearly identical to the original demographic weights for within-party comparisons (see @sec-weight-sensitivity).
+This is expected: our analyses compare behaviors across partisan groups, so what matters is whether each group is internally representative — a property the demographic weights already secure — not whether the mix of groups matches the national population.
+To the extent that differential partisan nonresponse persists after weighting — with health-disengaged Republicans less likely to participate in health surveys [@clinton_reluctant_2022] — the Republicans in our sample are likely more health-conscious than the Republican population as a whole, meaning our estimates of partisan gaps represent a conservative lower bound on true behavioral divergence.
 
 Political party identification was assessed by the panel provider prior to the survey.
 Upon enrollment in the panel, respondents selected their partisan affiliation from standard categories (Democrat, Republican, Independent, or Prefer not to Say/Other).

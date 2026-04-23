@@ -1,0 +1,354 @@
+/* ============================================================
+   PORTABLE POLARIZATION — PRESENTATION STYLES
+   Editorial aesthetic: Playfair Display + IBM Plex Sans
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&display=swap');
+
+/* ── CSS VARIABLES ─────────────────────────────────────────── */
+:root {
+  --dem:        #1a5276;
+  --rep:        #922b21;
+  --ind:        #1e7145;
+  --navy:       #1a2639;
+  --gold:       #b8891a;
+  --gold-light: #f5e6c3;
+  --bg:         #ffffff;
+  --bg-off:     #f8f7f4;
+  --border:     #e2ddd6;
+  --text:       #1a1a1a;
+  --muted:      #6b6b6b;
+  --slide-pad:  40px;
+}
+
+/* ── BASE TYPOGRAPHY ───────────────────────────────────────── */
+.reveal {
+  font-family: 'IBM Plex Sans', 'Helvetica Neue', sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* ── HEADINGS ──────────────────────────────────────────────── */
+.reveal h1,
+.reveal h2,
+.reveal h3 {
+  font-family: 'Playfair Display', Georgia, serif;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  text-transform: none;
+}
+
+/* Content slide titles */
+.reveal h2 {
+  font-size: 1.35em;
+  font-weight: 700;
+  color: var(--navy);
+  border-bottom: 2px solid var(--gold);
+  padding-bottom: 0.25em;
+  margin-bottom: 0.45em;
+  margin-top: 0;
+}
+
+/* Section divider title */
+.reveal h1 {
+  font-size: 1.9em;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.1em;
+}
+
+/* ── TITLE SLIDE ───────────────────────────────────────────── */
+.reveal .title-slide,
+#title-slide {
+  background: var(--navy);
+  text-align: left;
+  padding: 60px 80px;
+}
+
+#title-slide .title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.4em;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.1;
+  margin-bottom: 0.15em;
+  border: none;
+}
+
+#title-slide .subtitle {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 1.05em;
+  font-weight: 300;
+  color: #c8b89a;
+  letter-spacing: 0.02em;
+  margin-bottom: 1.5em;
+}
+
+#title-slide .author {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 0.85em;
+  color: #aaaaaa;
+  font-weight: 400;
+}
+
+#title-slide .date {
+  font-size: 0.75em;
+  color: #888888;
+}
+
+/* Gold accent bar on title slide */
+#title-slide::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, var(--gold), #e8c060, var(--gold));
+}
+
+/* ── SECTION DIVIDER SLIDES ('#' slides) ───────────────────── */
+.reveal section.has-dark-background {
+  background: linear-gradient(135deg, #1a2639 0%, #243447 60%, #2c3e50 100%) !important;
+}
+
+.reveal section.has-dark-background h1 {
+  font-size: 1.85em;
+  color: #ffffff;
+  border: none;
+  padding-bottom: 0;
+  margin-bottom: 0.25em;
+}
+
+.reveal section.has-dark-background p,
+.reveal section.has-dark-background li {
+  color: #c8b89a;
+  font-size: 0.9em;
+  font-weight: 300;
+}
+
+/* Gold accent line for section slides */
+.reveal section.has-dark-background::after {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 3px;
+  background: var(--gold);
+  margin: 0.6em auto 0;
+}
+
+/* ── BODY TEXT & LISTS ─────────────────────────────────────── */
+.reveal p {
+  line-height: 1.55;
+  margin-bottom: 0.5em;
+}
+
+.reveal ul,
+.reveal ol {
+  margin-left: 1.2em;
+  line-height: 1.6;
+}
+
+.reveal li {
+  margin-bottom: 0.3em;
+}
+
+.reveal ul li::marker {
+  color: var(--gold);
+}
+
+.reveal strong {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+/* ── BLOCKQUOTES ───────────────────────────────────────────── */
+.reveal blockquote {
+  background: var(--bg-off);
+  border-left: 4px solid var(--gold);
+  border-radius: 0 6px 6px 0;
+  padding: 0.6em 1.1em;
+  font-style: italic;
+  font-size: 0.92em;
+  color: #333;
+  width: 96%;
+  box-shadow: none;
+  margin: 0.6em 0;
+}
+
+.reveal blockquote p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── TABLES ────────────────────────────────────────────────── */
+.reveal table {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 0.76em;
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 0.3em;
+}
+
+.reveal table thead tr th {
+  background: var(--navy);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0.5em 0.9em;
+  text-align: left;
+  letter-spacing: 0.01em;
+  border: none;
+}
+
+.reveal table tbody tr td {
+  padding: 0.38em 0.9em;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.45;
+}
+
+.reveal table tbody tr:nth-child(even) {
+  background: var(--bg-off);
+}
+
+/* Highlight the hypothesis row */
+.reveal table tbody tr:last-child {
+  background: var(--gold-light);
+  font-weight: 600;
+  color: var(--navy);
+}
+
+/* ── IMAGES & FIGURES ──────────────────────────────────────── */
+.reveal img {
+  max-height: 58vh;
+  max-width: 100%;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  border-radius: 2px;
+}
+
+/* Figures inside columns get tighter height constraint */
+.reveal .columns .column img {
+  max-height: 50vh;
+  max-width: 100%;
+}
+
+/* ── CAPTION ───────────────────────────────────────────────── */
+.caption-note {
+  font-size: 0.6em;
+  color: var(--muted);
+  margin-top: 0.3em;
+  text-align: center;
+  font-style: italic;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+/* ── VERDICT BOXES ─────────────────────────────────────────── */
+.verdict-box {
+  border-left: 4px solid #888;
+  border-radius: 0 6px 6px 0;
+  padding: 0.5em 0.9em;
+  margin-top: 0.7em;
+  font-size: 0.82em;
+  line-height: 1.5;
+}
+
+.verdict-persist {
+  border-left-color: var(--rep);
+  background: #fdf0ee;
+  color: #5c1a10;
+}
+
+.verdict-narrow {
+  border-left-color: var(--dem);
+  background: #eef3fa;
+  color: #0d3459;
+}
+
+/* ── PORTABLE POLARIZATION GRID ─────────────────────────────── */
+.pp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75em;
+  margin: 0.6em 0;
+}
+
+.pp-cell {
+  background: #ffffff;
+  border: 2px solid var(--rep);
+  border-radius: 8px;
+  padding: 0.7em 1em;
+  font-size: 0.8em;
+  text-align: center;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(146, 43, 33, 0.08);
+}
+
+.pp-check {
+  color: var(--rep);
+  font-size: 1.5em;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 0.15em;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+/* ── PARTY COLOR SPANS ─────────────────────────────────────── */
+.dem { color: var(--dem); font-weight: 600; }
+.rep { color: var(--rep); font-weight: 600; }
+.ind { color: var(--ind); font-weight: 600; }
+
+/* ── SLIDE CHROME ──────────────────────────────────────────── */
+.reveal .progress {
+  height: 3px;
+}
+
+.reveal .progress span {
+  background: var(--gold);
+}
+
+.reveal .slide-number {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 0.65em;
+  color: var(--muted);
+  background: transparent;
+}
+
+/* ── COLUMNS LAYOUT ────────────────────────────────────────── */
+.reveal .columns {
+  display: flex;
+  gap: 1.5em;
+  align-items: flex-start;
+}
+
+.reveal .column {
+  flex: 1;
+}
+
+/* ── PRIVATE/PUBLIC COMPARISON COLUMNS ─────────────────────── */
+.private-col {
+  background: var(--bg-off);
+  border-top: 3px solid var(--dem);
+  border-radius: 6px;
+  padding: 0.7em 0.9em;
+}
+
+.public-col {
+  background: var(--bg-off);
+  border-top: 3px solid var(--rep);
+  border-radius: 6px;
+  padding: 0.7em 0.9em;
+}
+
+/* ── ARROW TEXT ────────────────────────────────────────────── */
+.arrow-conclusion {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--navy);
+  margin-top: 0.5em;
+  display: block;
+}
