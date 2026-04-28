@@ -1,0 +1,89 @@
+---
+title: "Portable Polarization: Partisan Identity, Expressive Attitudes, and COVID-19 Health Behavior"
+format: docx
+filters:
+  - wordcount.lua
+editor:
+  markdown:
+    wrap: sentence
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Load pre-calculated paper statistics
+stats_path <- "../../out/tables/paper_statistics.rds"
+if (!file.exists(stats_path)) stop("Run code/export_paper_statistics.R first.")
+paper_stats <- readRDS(stats_path)
+list2env(paper_stats, envir = environment())
+
+# Load wave-level adjusted gaps (contacts and masks)
+adj_gaps <- read_csv("../../out/tables/adjusted_gaps_by_wave.csv",
+                     show_col_types = FALSE)
+
+contacts_adj <- adj_gaps |> filter(outcome == "contacts")
+masks_adj    <- adj_gaps |> filter(outcome == "masks")
+
+# Peak contact gap: wave with largest Rep-Dem adjusted gap
+peak_contact_wave <- contacts_adj |> slice_max(gap_rep_dem, n = 1)
+peak_contact_gap  <- peak_contact_wave$gap_rep_dem
+peak_contact_wavenum <- peak_contact_wave$wave   # wave 3 = Sep '20
+
+# Smallest contact gap: wave 5 (winter 2020-21 surge)
+w5_contact_gap <- contacts_adj |> filter(wave == 5) |> pull(gap_rep_dem)
+
+# Mask gaps at wave 1 and wave 6 (Dem - Rep, so positive = Dem higher)
+w1_mask_gap <- masks_adj |> filter(wave == 1) |> pull(gap_ind_dem) |> abs()
+w1_mask_gap <- masks_adj |> filter(wave == 1) |>
+  mutate(gap = Democrat - Republican) |> pull(gap)
+w6_mask_gap <- masks_adj |> filter(wave == 6) |>
+  mutate(gap = Democrat - Republican) |> pull(gap)
+
+# Load regional adjusted gaps
+reg_gaps <- read_csv("../../out/tables/adj_gaps_by_region.csv",
+                     show_col_types = FALSE)
+
+contact_gap_min <- min(reg_gaps$contacts_gap_rd)
+contact_gap_max <- max(reg_gaps$contacts_gap_rd)
+mask_gap_min    <- min(reg_gaps$mask_gap_dr)
+mask_gap_max    <- max(reg_gaps$mask_gap_dr)
+```
+
+## Abstract
+
+### Introduction
+
+The COVID-19 pandemic revealed a striking pattern in American public health: counties that voted heavily for Donald Trump experienced substantially higher COVID-19 death rates, a divide that emerged during the pandemic and widened over time, particularly after vaccines became available [@gollwitzer_partisan_2020; @wallace_excess_2023].
+Yet county-level data cannot tell us whether individual partisans actually behaved differently, or whether observed patterns merely reflect the demographic and geographic sorting of partisans into different environments [@allcott_polarization_2020; @grossman_political_2020].
+Survey research has documented substantial partisan gaps in pandemic attitudes and linked them to health outcomes [@gadarian_partisanship_2021; @allcott_polarization_2020; @clinton_partisan_2021; @coleman_hurt_2024], but attitudinal studies capture what partisans *say* rather than what they *do*, and aggregate analyses cannot isolate whether behavioral divergence or geographic sorting drives the association [@krieger_relationship_2022; @neelon_spatial_2021].
+We address this gap using individual-level behavioral data to adjudicate between competing explanations: demographic sorting, policy environment, social conformity, risk perception, and objective pandemic severity.
+
+### Methods
+
+We analyze data from the Berkeley Interpersonal Contact Study (BICS), a nationally representative survey conducted across six waves from April 2020 to May 2021 (N = `r format(n_total, big.mark = ",")`; Democrats n = `r format(n_dem, big.mark = ",")`, Republicans n = `r format(n_rep, big.mark = ",")`, Independents n = `r format(n_ind, big.mark = ",")`).
+BICS collected detailed counts of daily face-to-face contacts and interaction-specific mask usage, providing behavioral measures less susceptible to social desirability bias than abstract attitudinal items.
+Individual survey responses are linked to county-level COVID-19 incidence and mortality rates (lagged one week), congressional district partisan composition (2020 House vote share), and county mask mandate status.
+Survey weights are raked on party identification to match national Gallup targets (30% Democrat, 29% Republican, 39% Independent).
+We estimate weighted means and progressive nested regression models — sequentially adding demographic controls (age, gender, race/ethnicity, education, employment, household size), contextual controls (local incidence/mortality, congressional district partisanship, policy environment), and wave fixed effects — to test whether partisan gaps survive each alternative explanation.
+To assess whether gaps narrow during high-severity periods, we estimate county fixed-effects models interacting party identification with lagged local incidence and mortality rates.
+
+### Results
+
+Republicans reported more daily contacts than Democrats across all six waves (adjusted wave-pooled gap: `r sprintf("%.1f", contacts_gap)` contacts/day; peak adjusted gap in Wave `r peak_contact_wavenum`: `r sprintf("%.1f", peak_contact_gap)` contacts/day).
+The contact gap compressed substantially during the winter 2020–21 mortality surge, narrowing to `r sprintf("%.1f", w5_contact_gap)` contacts/day in February 2021.
+In contrast, the adjusted partisan gap in mask usage widened monotonically from `r sprintf("%.1f", w1_mask_gap)` percentage points in Wave 1 (April–May 2020) to `r sprintf("%.1f", w6_mask_gap)` percentage points by Wave 6 (May 2021), showing no compression during mortality peaks.
+At its widest, the mask-wearing gap exceeded cross-group differences by race, gender, or education.
+Gaps persisted in all four U.S. Census regions (adjusted contact gaps: `r sprintf("%.1f", contact_gap_min)`–`r sprintf("%.1f", contact_gap_max)` contacts/day; adjusted mask gaps: `r sprintf("%.0f", mask_gap_min)`–`r sprintf("%.0f", mask_gap_max)` percentage points), within both Democratic- and Republican-leaning congressional districts, under strict and lenient mask mandates, and among respondents reporting identical levels of COVID-19 concern — including among the "very concerned," where the contact gap remained (`r sprintf("%.1f", contacts_vc_rep)` vs. `r sprintf("%.1f", contacts_vc_dem)` contacts/day for Republicans and Democrats, respectively).
+Republicans also had substantially lower vaccine acceptance than Democrats in Wave 6 (May 2021; `r sprintf("%.1f", vax_rep)`% vs. `r sprintf("%.1f", vax_dem)`%).
+
+### Discussion
+
+A long tradition in sociology treats social identities as structuring forces that shape behavior through group conformity, boundary maintenance, and durable dispositions [@tajfel_integrative_1979; @lamont_dignity_2000]; @cockerham_health_2005 extended this insight to health, arguing that behaviors cluster into group-anchored lifestyle patterns rather than reflecting individual calculation.
+Our findings extend this tradition by establishing partisan identity as a strong, independent predictor of health behavior — one whose association with behavior is portable across policy, place, and demography.
+The divergent temporal trajectories of contact and mask-wearing gaps illuminate the mechanism: contact gaps compressed during mortality surges, indicating that private, high-stakes behavior retained responsiveness to objective risk, while mask-wearing polarization widened regardless of conditions, consistent with masking functioning as what @goffman_stigma_1963 would recognize as a stigma symbol — a publicly legible group marker governed by identity costs rather than health calculus.
+Crucially, during the winter 2020–21 surge, Republicans reported their lowest concern levels yet reduced contacts substantially, revealing that expressed attitudes had become performative signals of group allegiance while behavior tracked objective conditions: the belief had decoupled from the behavior [@clinton_partisan_2021].
+Public health messaging designed to raise stated concern may therefore change what people say without changing what they do; interventions that make local consequences visible and immediate are likely more effective [@pink_elite_2021].
+More broadly, these findings establish partisan identity as a predictor of health behavior rivaling race, gender, and education in magnitude — with lasting implications for health inequality in the United States.
