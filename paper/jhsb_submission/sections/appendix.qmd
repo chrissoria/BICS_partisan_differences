@@ -1926,65 +1926,61 @@ library(patchwork)
 library(cowplot)
 
 # Load Wave 1 behaviors by concern level (binary: Very Concerned vs Less Concerned)
-behaviors_wave1 <- read_csv("../../out/tables/behaviors_by_concern_level_wave1.csv", show_col_types = FALSE) %>%
-  mutate(
-    political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
-    concern_level = factor(concern_level,
-                           levels = c("Less Concerned", "Very Concerned"))
-  )
+behaviors_wave1 <- read_csv("../../out/tables/behaviors_by_concern_level_wave1.csv", show_col_types = FALSE)
 
-# Calculate R-D gaps at each concern level
-gaps_wave1 <- behaviors_wave1 %>%
-  select(concern_level, political_party, contacts, mask_usage, n) %>%
-  pivot_wider(names_from = political_party, values_from = c(contacts, mask_usage, n)) %>%
-  mutate(
-    contacts_gap_rd = contacts_Republican - contacts_Democrat,
-    mask_gap_dr = mask_usage_Democrat - mask_usage_Republican,
-    n_label = paste0("D:", n_Democrat, " R:", n_Republican)
-  )
+if (nrow(behaviors_wave1) > 0) {
+  behaviors_wave1 <- behaviors_wave1 %>%
+    mutate(
+      political_party = factor(political_party, levels = c("Republican", "Independent", "Democrat")),
+      concern_level = factor(concern_level, levels = c("Less Concerned", "Very Concerned"))
+    )
 
-# Panel A: Contact gap by concern level
-p_contact_gap_w1 <- ggplot(gaps_wave1, aes(x = concern_level, y = contacts_gap_rd)) +
-  geom_col(fill = "#7570b3", alpha = 0.7, width = 0.6, color = "black") +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-  geom_text(aes(label = sprintf("%.1f", contacts_gap_rd)),
-            vjust = ifelse(gaps_wave1$contacts_gap_rd >= 0, -0.5, 1.5),
-            size = 3.5, fontface = "bold") +
-  geom_text(aes(label = n_label, y = 0), vjust = 1.5, size = 2.5, color = "gray40") +
-  labs(x = NULL, y = "R-D Contact Gap", title = "A. Contact Gap (Wave 1)") +
-  theme_cowplot() +
-  theme(
-    plot.title = element_text(face = "bold", size = 11),
-    axis.text.x = element_text(size = 10)
-  )
+  gaps_wave1 <- behaviors_wave1 %>%
+    select(concern_level, political_party, contacts, mask_usage, n) %>%
+    pivot_wider(names_from = political_party, values_from = c(contacts, mask_usage, n)) %>%
+    mutate(
+      contacts_gap_rd = contacts_Republican - contacts_Democrat,
+      mask_gap_dr = mask_usage_Democrat - mask_usage_Republican,
+      n_label = paste0("D:", n_Democrat, " R:", n_Republican)
+    )
 
-# Panel B: Mask gap by concern level
-p_mask_gap_w1 <- ggplot(gaps_wave1, aes(x = concern_level, y = mask_gap_dr)) +
-  geom_col(fill = "#1b9e77", alpha = 0.7, width = 0.6, color = "black") +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-  geom_text(aes(label = sprintf("%.1f", mask_gap_dr)),
-            vjust = ifelse(gaps_wave1$mask_gap_dr >= 0, -0.5, 1.5),
-            size = 3.5, fontface = "bold") +
-  geom_text(aes(label = n_label, y = 0), vjust = 1.5, size = 2.5, color = "gray40") +
-  labs(x = NULL, y = "D-R Mask Gap (pp)", title = "B. Mask Gap (Wave 1)") +
-  theme_cowplot() +
-  theme(
-    plot.title = element_text(face = "bold", size = 11),
-    axis.text.x = element_text(size = 10)
-  )
+  p_contact_gap_w1 <- ggplot(gaps_wave1, aes(x = concern_level, y = contacts_gap_rd)) +
+    geom_col(fill = "#7570b3", alpha = 0.7, width = 0.6, color = "black") +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_text(aes(label = sprintf("%.1f", contacts_gap_rd)),
+              vjust = ifelse(gaps_wave1$contacts_gap_rd >= 0, -0.5, 1.5),
+              size = 3.5, fontface = "bold") +
+    geom_text(aes(label = n_label, y = 0), vjust = 1.5, size = 2.5, color = "gray40") +
+    labs(x = NULL, y = "R-D Contact Gap", title = "A. Contact Gap (Wave 1)") +
+    theme_cowplot() +
+    theme(plot.title = element_text(face = "bold", size = 11), axis.text.x = element_text(size = 10))
 
-p_contact_gap_w1 + p_mask_gap_w1
+  p_mask_gap_w1 <- ggplot(gaps_wave1, aes(x = concern_level, y = mask_gap_dr)) +
+    geom_col(fill = "#1b9e77", alpha = 0.7, width = 0.6, color = "black") +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_text(aes(label = sprintf("%.1f", mask_gap_dr)),
+              vjust = ifelse(gaps_wave1$mask_gap_dr >= 0, -0.5, 1.5),
+              size = 3.5, fontface = "bold") +
+    geom_text(aes(label = n_label, y = 0), vjust = 1.5, size = 2.5, color = "gray40") +
+    labs(x = NULL, y = "D-R Mask Gap (pp)", title = "B. Mask Gap (Wave 1)") +
+    theme_cowplot() +
+    theme(plot.title = element_text(face = "bold", size = 11), axis.text.x = element_text(size = 10))
+
+  print(p_contact_gap_w1 + p_mask_gap_w1)
+} else {
+  message("Wave 1 concern-level data not available. Re-run export_paper_statistics.R to regenerate.")
+}
 ```
 
 Comparing Wave 1 to the pooled results reveals whether the early pandemic---before extensive politicization---showed different patterns. If concrete mortality threat reduces polarization, we might expect smaller or even reversed gaps in Wave 1 compared to later periods.
 
 ### The Politicization of Mask-Wearing: Exact Gap Values
 
-@fig-behavior-very-concerned above shows how mask-wearing patterns among the "very concerned" reversed over time, alongside the changing composition of who reports being very concerned. @fig-mask-gap-very-concerned-over-time provides the exact D-R gap values for each wave.
+@fig-behavior-very-concerned above shows how mask-wearing patterns among the "very concerned" reversed over time, alongside the changing composition of who reports being very concerned. @fig-mask-gap-very-concerned-over-time provides the exact D-R gap values for each wave. Note that Wave 1 (April 2020) is excluded from this analysis because the strong-concern indicator was not measured in that wave.
 
 ```{r}
 #| label: fig-mask-gap-very-concerned-over-time
-#| fig-cap: "D-R Mask Gap Among 'Very Concerned' Respondents Over Time. Bars show the Democrat-Republican difference in mask usage among those reporting being 'very concerned' about COVID-19. Negative values (red) indicate Republicans wore masks more; positive values (blue) indicate Democrats wore masks more. The reversal from waves 1-3 to waves 4-6 is evident. See @fig-behavior-very-concerned for context on changing composition."
+#| fig-cap: "D-R Mask Gap Among 'Very Concerned' Respondents Over Time (Waves 2–6). Bars show the Democrat-Republican difference in mask usage among those reporting being 'very concerned' about COVID-19. Wave 1 is excluded because the strong-concern indicator was not measured in that wave. Negative values (red) indicate Republicans wore masks more; positive values (blue) indicate Democrats wore masks more. The reversal from waves 2–3 to waves 4–6 is evident. See @fig-behavior-very-concerned for context on changing composition."
 #| fig-height: 4
 #| fig-width: 7
 
@@ -1995,8 +1991,10 @@ mask_vc <- read_csv("../../out/tables/mask_among_very_concerned_by_wave.csv", sh
   filter(political_party %in% c("Democrat", "Republican")) %>%
   mutate(
     political_party = factor(political_party, levels = c("Democrat", "Republican")),
-    wave_label = factor(wave, labels = c("Wave 1\nApr '20", "Wave 2\nJun '20", "Wave 3\nSep '20",
-                                          "Wave 4\nDec '20", "Wave 5\nFeb '21", "Wave 6\nMay '21"))
+    wave_label = factor(wave,
+                        levels = c(2, 3, 4, 5, 6),
+                        labels = c("Wave 2\nJun '20", "Wave 3\nSep '20",
+                                   "Wave 4\nDec '20", "Wave 5\nFeb '21", "Wave 6\nMay '21"))
   )
 
 # Calculate D-R gap by wave
