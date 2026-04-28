@@ -26,10 +26,13 @@ if (!file.exists(data_path)) {
 
 bics <- read_csv(data_path, show_col_types = FALSE)
 
-# Use weight_party_raked if available, otherwise fall back to weight_pooled
+# Use weight_party_raked if available; otherwise generate it via raking script
 if (!"weight_party_raked" %in% names(bics)) {
-  bics$weight_party_raked <- bics$weight_pooled
-  cat("Note: weight_party_raked not found, using weight_pooled.\n")
+  cat("Note: weight_party_raked not in CSV — running 00a-Create_Party_Weights.R to generate it.\n")
+  bics_zip_features <- bics  # weights script expects this name
+  source(here("code", "00a-Create_Party_Weights.R"))
+  bics <- bics_zip_features  # pull back with weight_party_raked added
+  rm(bics_zip_features)
 }
 
 # Filter to valid parties
@@ -44,7 +47,7 @@ bics_valid <- bics_valid %>%
     vax_acceptance = case_when(
       Vaccinated == 1 ~ 1L,
       will_get_vax == 1 ~ 1L,
-      !is.na(Vaccinated) | !is.na(will_get_vax) ~ 0L,
+      !is.na(covid19_vax) ~ 0L,   # only code as 0 if they actually answered the vaccine question
       TRUE ~ NA_integer_
     )
   )
@@ -109,11 +112,17 @@ cat("Sample size:", nrow(bics_valid), "\n\n")
 
 cat("Calculating sample characteristics...\n")
 
-# Sample sizes
+# Sample sizes (unweighted counts)
 n_total <- nrow(bics_valid)
 n_dem <- sum(bics_valid$political_party == "Democrat")
 n_rep <- sum(bics_valid$political_party == "Republican")
 n_ind <- sum(bics_valid$political_party == "Independent")
+
+# Weighted party proportions (should match Gallup 2020 targets: 30% Dem, 29% Rep, 39% Ind)
+total_weight <- sum(bics_valid$weight_party_raked, na.rm = TRUE)
+pct_dem_wtd <- sum(bics_valid$weight_party_raked[bics_valid$political_party == "Democrat"], na.rm = TRUE) / total_weight * 100
+pct_rep_wtd <- sum(bics_valid$weight_party_raked[bics_valid$political_party == "Republican"], na.rm = TRUE) / total_weight * 100
+pct_ind_wtd <- sum(bics_valid$weight_party_raked[bics_valid$political_party == "Independent"], na.rm = TRUE) / total_weight * 100
 
 # Demographics by party (weighted)
 demo_by_party <- bics_valid %>%
@@ -1058,9 +1067,9 @@ paper_stats <- list(
   n_dem = n_dem,
   n_rep = n_rep,
   n_ind = n_ind,
-  pct_dem = n_dem / n_total * 100,
-  pct_rep = n_rep / n_total * 100,
-  pct_ind = n_ind / n_total * 100,
+  pct_dem = pct_dem_wtd,
+  pct_rep = pct_rep_wtd,
+  pct_ind = pct_ind_wtd,
 
   # Demographics
   age_dem = get_val(demo_by_party, "Democrat", "avg_age"),
@@ -2137,8 +2146,17 @@ cat("  Behaviors by city exported to behaviors_by_city.csv\n")
 cat("Calculating behaviors by opposing-party CD and party...\n")
 
 behaviors_by_opposing_cd <- bics_valid %>%
-  filter(!is.na(In_Opposing_Party_CD)) %>%
-  mutate(opposing_cd = ifelse(In_Opposing_Party_CD == 1, "Opposing-party CD", "Same-party CD")) %>%
+  filter(!is.na(CONGRESSPERSON_PARTY)) %>%
+  filter(political_party != "Prefer not to answer") %>%
+  mutate(
+    # Normalize "Democratic" → "Democrat" to match political_party coding
+    cd_party_norm = case_when(
+      CONGRESSPERSON_PARTY == "Democratic" ~ "Democrat",
+      TRUE ~ CONGRESSPERSON_PARTY
+    ),
+    In_Opposing_Party_CD_fixed = as.integer(political_party != cd_party_norm),
+    opposing_cd = ifelse(In_Opposing_Party_CD_fixed == 1, "Opposing-party CD", "Same-party CD")
+  ) %>%
   group_by(opposing_cd, political_party) %>%
   summarise(
     n = n(),

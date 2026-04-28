@@ -9,28 +9,28 @@ editor:
 Partisan gaps in health behavior persisted across every context we examined, a pattern we termed "portable polarization."
 A long tradition in sociology treats social identities as structuring forces that shape behavior through mechanisms of group conformity, boundary maintenance, and durable dispositions [@tajfel_integrative_1979; @bourdieu_distinction_1984; @lamont_dignity_2000].
 In the health domain specifically, @cockerham_health_2005 argued that health behaviors are not reducible to individual agency but are structured by collective, group-level forces, an insight that health lifestyles research has since confirmed across multiple populations and behavioral domains [@mollborn_contributions_2021].
-Our findings extend this tradition by supporting the claim that partisan identity is a potent structuring force in health behavior.
-Partisan differences in social contacts and mask-wearing during the COVID-19 pandemic were substantial, with the partisan gap in mask-wearing exceeding differences by race, gender, or education, and proved remarkably resistant to every alternative explanation we tested, consistent with @clinton_partisan_2021's finding that partisanship substantially outweighed local public health conditions in predicting pandemic mobility behavior.
-They persisted within shared policy environments, across geographic regions, regardless of local partisan composition, and after controlling for demographics.
-This pattern of "portable polarization," behavioral differences that prove remarkably robust across diverse contexts even as partisans adjust modestly toward local norms, is consistent with the claim that partisanship has become a fundamental social identity in American life, one that shapes health behavior directly rather than merely correlating with the environments in which partisans are embedded [@de_hoog_social_2024].
+Our findings extend this tradition by showing that partisan identity is a significant independent predictor of health behavior.
+Partisan differences in social contacts and mask-wearing during the COVID-19 pandemic were substantial, with the partisan gap in mask-wearing exceeding differences by race, gender, or education, and were not fully accounted for by any of the alternative explanations we examined, consistent with @clinton_partisan_2021's finding that partisanship substantially outweighed local public health conditions in predicting pandemic mobility behavior.
+These associations persisted within shared policy environments, across geographic regions, regardless of local partisan composition, and after controlling for demographics.
+This pattern of "portable polarization" — partisan associations that prove robust across diverse contexts even as partisans adjust modestly toward local norms — is consistent with partisanship having become a fundamental social identity in American life, one independently associated with health behavior beyond the demographic and contextual environments in which partisans are embedded [@de_hoog_social_2024].
 
-## Identity Operates Through Social Observability
+## Identity and Social Observability
 
-Three findings triangulate on a specific mechanism through which partisan identity shapes health behavior, pointing to social observability rather than risk assessment as the operative channel.
+Three findings together suggest that social observability is the channel through which partisan identity is associated with health behavior.
 
 *The severity asymmetry.*
-Social contacts — a private, high-stakes behavior largely unobservable by one's political community — narrowed in partisan gap during high-mortality periods, indicating that concrete consequences can temporarily override partisan divergence when the behavior is private and the personal stakes are immediate.
+Social contacts — a private, high-stakes behavior largely unobservable by one's political community — narrowed in partisan gap during high-mortality periods, indicating that concrete risk consequences compress partisan gaps in private, high-stakes behaviors.
 Mask-wearing, a visible, low-cost behavior, showed steadily widening polarization through the same winter surge that compressed the contact gap.
 This dissociation is inconsistent with any single-mechanism account that would predict uniform effects across two behaviors protecting against the same threat.
 If partisan gaps arose from the genuine belief that masks are ineffective, mask behavior should respond to rising mortality the same way contact behavior does; it does not.
 A cost-based account fares no better: if gaps primarily reflect material sacrifice, mask gaps should also narrow during surges when the health cost of not masking rises alongside mortality.
-Instead, only the private, high-cost behavior responded to heightened risk — ruling out purely instrumental explanations and pointing toward a mechanism that operates selectively on visible behaviors.
+Instead, only the private, high-cost behavior responded to heightened risk — a pattern inconsistent with purely instrumental explanations and suggestive of a mechanism that operates selectively on visible behaviors.
 
 *The concern asymmetry.*
 Risk perception offers a partial but insufficient account.
 Among respondents reporting the same level of stated concern, contact gaps persist at every level while mask gaps narrow substantially only among the very concerned.
 This asymmetry mirrors the severity finding: contact behavior tracks objective conditions (local mortality) while mask behavior tracks social and attitudinal channels — but even stated concern does not eliminate the mask gap except at its most extreme level.
-The two behaviors are responsive to different inputs, a pattern that rules out perception as a sufficient explanation and identifies the social/symbolic channel as the one through which masking is specifically organized.
+The two behaviors are responsive to different inputs, a pattern that indicates perception is not a sufficient account and is consistent with a social/symbolic channel through which masking may be organized.
 
 *The audience effect.*
 If masking were a purely private health decision, it should not respond to the partisan composition of one's local environment — infection risk does not change because one's neighbors are Republicans or Democrats.
@@ -38,17 +38,16 @@ But it does respond: Democrats mask significantly less in Republican-majority di
 This is the signature of a behavior sensitive to social audience, consistent with what @goffman_stigma_1963 identified as impression management — behavior calibrated to audience rather than to private calculation.
 This is a more specific claim than Tajfel-Turner in-group identification per se: the behavior is not simply reflecting group membership but is being actively tuned to who is watching.
 The audience effect is also consistent with norm transmission through social ties, since partisans with more co-partisan neighbors likely absorb mask-positive or mask-negative norms from their networks; our data cannot fully distinguish active signaling from passive norm diffusion.
-But both processes operate through social observability, and both predict the pattern we observe — masking shifts with audience composition while contact behavior does not — in ways that purely individual risk-based accounts cannot [@betsch_social_2020; @kahan_misconceptions_2017].
+But both processes operate through social observability, and both are consistent with the pattern we observe — masking shifts with audience composition while contact behavior does not — in ways that purely individual risk-based accounts do not predict [@betsch_social_2020; @kahan_misconceptions_2017].
 
-Taken together, the three findings converge on a mechanism more specific than "identity matters."
+Taken together, the three findings are consistent with a mechanism more specific than "identity matters."
 Mask behavior is responsive to social audience (local composition effect), insensitive to objective severity (widening gap through the winter surge), and only partially responsive to stated concern.
 Contact behavior shows the opposite pattern — responsive to severity, unaffected by audience composition, persistent across concern levels.
 Two behaviors, same respondents, opposite responsiveness profiles to the same environmental inputs.
-The difference is visibility: partisan identity shapes health behavior through observability channels, with mask-wearing functioning as a publicly legible identity marker whose performance is governed by social norms and audience composition rather than by health risk.
+The difference is visibility: these patterns are consistent with partisan identity being associated with health behaviors through observability channels, with mask-wearing functioning as a publicly legible identity marker whose expression appears to be governed more by social norms and audience composition than by health risk.
 
-This narrows the mechanism from "identity matters" to a more specific claim about process.
-Active signaling and norm crystallization are both consistent with the three findings, but the monotonic temporal widening of the mask gap — steady rather than episodic — is more consistent with norm crystallization, in which Democrats habituated to masking as a default while Republicans consolidated an anti-mask norm, than with active signaling, which would be expected to fluctuate with contextual cues.
-What our data establish is that whatever the specific process, it operated selectively on the visible behavior and not on the private one, and that social observability is a necessary condition for the identity mechanism at work.
+Among plausible mechanisms, the temporal pattern further distinguishes between active signaling and norm crystallization: the monotonic widening of the mask gap — steady rather than episodic — is more consistent with norm crystallization, in which Democrats habituated to masking as a default while Republicans consolidated an anti-mask norm, than with active signaling, which would be expected to fluctuate with contextual cues.
+What our data establish is that the partisan association operated selectively on the visible behavior and not on the private one — making social observability a defining feature of the partisan–health association we observe.
 
 The geographic distribution of partisan gaps further illuminates how context and identity interact.
 Where gaps were smaller, as in the South, the narrowing reflected Democrats behaving less cautiously rather than Republicans becoming more cautious, a pattern visible across demographic and contextual subgroups (@sec-behavior-levels-table): context shifted absolute levels of behavior without closing the partisan divide.
@@ -58,12 +57,12 @@ If Republican behavior is primarily shaped by nationally circulated partisan cue
 
 Earlier work using GPS mobility data found that partisan identity moderated responses to elite messaging from the pandemic's earliest days: Democratic-leaning counties responded about twice as strongly to governors' stay-at-home recommendations as Republican-leaning counties, even after accounting for demographics, occupational structure, and local case rates [@grossman_political_2020].
 Our individual-level data are consistent with this early divergence but reveal an additional dynamic: the behavioral gaps we measure *widened* over time, particularly for visible behaviors like mask-wearing, suggesting that what began as differential responsiveness to elite cues crystallized into durable identity markers as the pandemic progressed.
-The persistence of partisan behavioral gaps even after accounting for perceived severity suggests that behavior has decoupled from belief, precisely the space where identity-based theories do their explanatory work [@tajfel_integrative_1979; @goffman_stigma_1963; @lamont_dignity_2000].
+The persistence of partisan behavioral gaps even after accounting for perceived severity is consistent with behavior having decoupled from belief, precisely the space where identity-based theories do their explanatory work [@tajfel_integrative_1979; @goffman_stigma_1963; @lamont_dignity_2000].
 This finding challenges the assumption, common in survey-based health research, that stated attitudes reliably predict protective behavior on politicized health topics.
 Experimental evidence reinforces this point: @pink_elite_2021 found that Republican elite endorsements increased vaccination intentions among Republicans, while Democratic endorsements produced backlash, reducing Republicans' willingness to encourage others to vaccinate, suggesting that partisan identity filters even well-intentioned health communication.
 
 This study contributes to the sociology of health by showing that partisan identity is independently associated with health behavior in ways not reducible to policy, perception, or place, extending recent work in this journal showing that partisan polarization structures trust in scientific authorities in ways that intensify among the most knowledgeable [@gauchat_partisan_2025] from the domain of attitudes to the domain of behavior.
-The competing-explanations framework offers a generalizable approach for descriptive studies seeking to constrain causal accounts: by systematically testing where each alternative explanation predicts gaps should narrow, we identify the account that survives the most stringent comparisons.
+The competing-explanations framework offers a generalizable approach for descriptive studies seeking to constrain causal accounts: by systematically examining where each alternative explanation would predict weaker associations, we show which alternatives do not fully account for the partisan–health association.
 
 Several limitations warrant consideration alongside these contributions.
 Our data are observational and cross-sectional within each wave, precluding strong causal claims; we observe associations between partisan identity and health behavior but cannot definitively rule out unmeasured confounders.

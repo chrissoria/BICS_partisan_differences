@@ -1447,7 +1447,14 @@ generating binary variables for whether someone is in an opposing party CD (to o
 ```{r}
 bics_zip_features <- bics_zip_features %>%
   mutate(
-    In_Opposing_Party_CD = as.integer(political_party != CONGRESSPERSON_PARTY & !is.na(CONGRESSPERSON_PARTY) & political_party != "Prefer not to answer"),
+    In_Opposing_Party_CD = as.integer(
+      !is.na(CONGRESSPERSON_PARTY) &
+      political_party != "Prefer not to answer" &
+      political_party != case_when(
+        CONGRESSPERSON_PARTY == "Democratic" ~ "Democrat",
+        TRUE ~ CONGRESSPERSON_PARTY
+      )
+    ),
     Independent = as.integer(political_party == "Independent"),
     Vaccinated = case_when(
       covid19_vax == "Yes, I have received at least one dose of a vaccine" ~ 1L,
@@ -2076,14 +2083,16 @@ average_IFR_by_party
 bics_zip_features <- bics_zip_features %>%
   mutate(
     # Individual categories
-    definitely_get_vax = as.integer(covid19_whynot_vax == "Definitely get a vaccine"),
-    probably_get_vax = as.integer(covid19_whynot_vax == "Probably get a vaccine"),
-    probably_not_get_vax = as.integer(covid19_whynot_vax == "Probably NOT get a vaccine"),
-    definitely_not_get_vax = as.integer(covid19_whynot_vax == "Definitely NOT get a vaccine"),
-    
+    # Use ifelse to preserve NAs: NA %in% c(...) returns FALSE in R, not NA,
+    # so as.integer() alone would silently recode non-respondents as 0.
+    definitely_get_vax    = ifelse(is.na(covid19_whynot_vax), NA_integer_, as.integer(covid19_whynot_vax == "Definitely get a vaccine")),
+    probably_get_vax      = ifelse(is.na(covid19_whynot_vax), NA_integer_, as.integer(covid19_whynot_vax == "Probably get a vaccine")),
+    probably_not_get_vax  = ifelse(is.na(covid19_whynot_vax), NA_integer_, as.integer(covid19_whynot_vax == "Probably NOT get a vaccine")),
+    definitely_not_get_vax = ifelse(is.na(covid19_whynot_vax), NA_integer_, as.integer(covid19_whynot_vax == "Definitely NOT get a vaccine")),
+
     # Grouped categories
-    will_get_vax = as.integer(covid19_whynot_vax %in% c("Definitely get a vaccine", "Probably get a vaccine")),
-    will_not_get_vax = as.integer(covid19_whynot_vax %in% c("Probably NOT get a vaccine", "Definitely NOT get a vaccine"))
+    will_get_vax     = ifelse(is.na(covid19_whynot_vax), NA_integer_, as.integer(covid19_whynot_vax %in% c("Definitely get a vaccine", "Probably get a vaccine"))),
+    will_not_get_vax = ifelse(is.na(covid19_whynot_vax), NA_integer_, as.integer(covid19_whynot_vax %in% c("Probably NOT get a vaccine", "Definitely NOT get a vaccine")))
   )
 
 # verify the results

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -8,7 +8,7 @@ This project analyzes partisan differences in health behaviors during the COVID-
 
 ## Target Publications
 
-1. **Journal of Health and Social Behavior (JHSB)** - First choice; ASA health specialty journal; ~8,000 words
+1. **Journal of Health and Social Behavior (JHSB)** - First choice; ASA health specialty journal; ~10,000 words
 2. **Social Science & Medicine** - Interdisciplinary; generous word limit (~8,000-10,000)
 3. **Sociological Science** - Fast review; open access; growing prestige
 4. **SSM - Population Health** - Newer journal; good fit for population health disparities
@@ -43,12 +43,6 @@ This project analyzes partisan differences in health behaviors during the COVID-
 - **"Portable polarization"**: If gaps persist across contexts, identity overrides local culture
 - **Perception as performative**: Stated perceptions may be expressive (what group members "should" say)
 
-### Data Strengths to Emphasize
-- **Actual contact counts** (not abstract categorical questions)
-- **Mask usage during specific contacts** (behavioral, not attitudinal)
-- Relevant for: polarization researchers, disease modelers, heterogeneity in population dynamics
-- Heterogeneity matters: population averages can obscure variation that shifts disease outcomes
-
 ### Research Questions
 1. Are partisan differences in health behaviors robust to policy, geography, and demographics?
 2. Under what conditions are partisan gaps largest vs. smallest?
@@ -57,77 +51,68 @@ This project analyzes partisan differences in health behaviors during the COVID-
 
 ```
 BICS_partisan_differences/
-├── code/                    # Analysis scripts
-│   ├── 00-Prep_BICS_Data.Rmd           # Data preparation (run first)
-│   ├── 00a-Create_Party_Weights.R      # Creates raked party weights
-│   ├── 01-descriptive_tables_plots.Rmd # Descriptive statistics
+├── code/                    # Analysis scripts (run in numbered order)
+│   ├── 00-Prep_BICS_Data.Rmd           # Data preparation (run first); outputs BICS_ZIP_Features.csv
+│   ├── 00a-Create_Party_Weights.R      # Creates raked party weights (sourced by export script)
+│   ├── 01-descriptive_tables_plots.Rmd # Descriptive statistics; requires plot_helper_functions/
 │   ├── 01a-Weight_Sensitivity_Analysis.R # Weight sensitivity analysis
-│   ├── 02-differences.Rmd              # Partisan differences analysis
-│   ├── 03-waves_pooled_behavior.Rmd    # Pooled behavior regressions
-│   ├── 04-opposing_districts_waves_pooled_behavior.Rmd
-│   ├── 05-incidence_mortality_response.Rmd
-│   └── export_paper_statistics.R       # Exports stats for paper
-├── data/                    # Data files
-│   └── BICS_ZIP_Features.csv           # Main analysis dataset
+│   ├── 02-differences.Rmd              # Partisan differences (demographic adjustment); requires plot_helper_functions/
+│   ├── 03-waves_pooled_behavior.Rmd    # Pooled behavior regressions; requires plot_helper_functions/
+│   ├── 04-opposing_districts_waves_pooled_behavior.Rmd  # Cross-cutting context tests
+│   ├── 05-incidence_mortality_response.Rmd              # Pandemic severity response
+│   └── export_paper_statistics.R       # Exports all stats to paper_statistics.rds
+├── data/                    # Raw and processed data files
+│   └── BICS_ZIP_Features.csv           # Main analysis dataset (output of 00-Prep)
 ├── out/                     # Output files
 │   ├── plots/
 │   └── tables/
-│       ├── paper_statistics.rds        # Pre-calculated paper statistics
-│       ├── weight_sensitivity_summary.csv
-│       └── regression_weight_sensitivity.csv
+│       └── paper_statistics.rds        # Pre-calculated paper statistics (single source of truth)
 └── paper/                   # Quarto paper
-    ├── partisan_differences.qmd        # Main document
-    ├── sections/                       # Paper sections (included in main)
+    ├── partisan_differences.qmd        # Main document (APA citations, quarto defaults)
+    ├── sections/                       # Modular sections included by main document
     │   ├── introduction.qmd
     │   ├── methods.qmd
-    │   ├── results.qmd
+    │   ├── results.qmd                 # Loads paper_statistics.rds via list2env()
     │   ├── discussion.qmd
+    │   ├── conclusion.qmd
     │   └── appendix.qmd
-    └── references.bib
+    ├── references.bib
+    └── jhsb_submission/                # JHSB-formatted version (ASA citations, anonymized)
+        ├── CLAUDE.md                   # JHSB formatting requirements
+        ├── partisan_differences.qmd
+        ├── american-sociological-association.csl
+        ├── references.bib
+        └── sections/                   # Parallel section files with JHSB-specific edits
 ```
 
 ## Analysis Pipeline
 
 Run scripts in this order:
 
-1. `00-Prep_BICS_Data.Rmd` - Prepares data, creates `weight_party_raked`
-2. `export_paper_statistics.R` - Exports statistics for paper
-3. Other analysis scripts (01-05) as needed
-4. Render paper with `quarto render paper/partisan_differences.qmd`
+1. `00-Prep_BICS_Data.Rmd` - Prepares data, creates `weight_party_raked`, outputs `data/BICS_ZIP_Features.csv`
+2. `export_paper_statistics.R` - Auto-sources `00a-Create_Party_Weights.R` if needed; outputs `out/tables/paper_statistics.rds`
+3. Other analysis scripts (01–05) as needed
+4. Render paper
 
 ## Paper Statistics Workflow
 
-**Key principle:** The paper reads pre-calculated statistics from `out/tables/paper_statistics.rds` rather than recalculating values. This ensures:
-- Consistency between analysis code and paper
-- Faster paper rendering
-- Single source of truth for all statistics
+**Key principle:** The paper reads pre-calculated statistics from `out/tables/paper_statistics.rds` rather than recalculating values. This ensures consistency between analysis code and paper.
 
-**How it works:**
+`code/export_paper_statistics.R` calculates all key statistics and saves them. `paper/sections/results.qmd` loads them:
 
-1. `code/export_paper_statistics.R` calculates all key statistics:
-   - Sample sizes and percentages
-   - Demographics by party (age, gender, race, metro, education, employment)
-   - Health behaviors (contacts, mask usage, vaccination)
-   - Partisan gaps
+```r
+paper_stats <- readRDS("../out/tables/paper_statistics.rds")
+list2env(paper_stats, envir = environment())
+```
 
-2. Statistics are saved to `out/tables/paper_statistics.rds`
-
-3. `paper/sections/results.qmd` loads and uses these statistics:
-   ```r
-   paper_stats <- readRDS("../out/tables/paper_statistics.rds")
-   list2env(paper_stats, envir = environment())
-   ```
-
-4. Inline R code references the statistics:
-   ```
-   Republicans reported `r sprintf("%.1f", contacts_rep)` contacts...
-   ```
+Inline R code then references statistics directly:
+```
+Republicans reported `r sprintf("%.1f", contacts_rep)` contacts...
+```
 
 **To update paper statistics:** Re-run `code/export_paper_statistics.R`
 
 ## Weighting
-
-The project uses two weight variables:
 
 - `weight_pooled` - Original demographic weights (age, gender, race, education)
 - `weight_party_raked` - Raked weights that also adjust for party ID to match Gallup 2020 targets (30% Dem, 29% Rep, 39% Ind)
@@ -136,23 +121,56 @@ All main analysis scripts use `weight_party_raked`. The weight sensitivity analy
 
 ## Key Variables
 
+**Outcome variables:**
 - `num_cc` - Total daily contacts
 - `num_cc_nonhh` - Non-household contacts
-- `Norm_Masks_Used` - Mask usage (0-100 scale)
-- `vax_acceptance` - Vaccine acceptance: vaccinated OR intends to vaccinate (wave 6 only)
+- `log_num_cc` - Log-transformed contacts
+- `num_cc_50_max`, `num_cc_25_max`, `num_cc_15_max` - Capped contact counts (outlier robustness)
+- `Norm_Masks_Used` - Mask usage (0–100 scale)
+- `vax_acceptance` - Vaccinated OR intends to vaccinate (wave 6 only)
 - `Vaccinated` - Vaccination status only (wave 6 only)
-- `will_get_vax` - Intends to get vaccinated among unvaccinated
+- `will_get_vax` - Intends to get vaccinated (unvaccinated respondents)
+
+**Predictors and context:**
 - `political_party` - Democrat, Republican, Independent
+- `republican` - Binary indicator
+- `CD_PERCENT_DEMOCRAT` - Congressional district partisanship (opposing-context variable)
+- `political_party_to_CD` - 4-level interaction (Dem/Rep × Dem CD/Rep CD) for script 04
+- `county_mask_mandate` - Strict / Less Strict / Unspecified / None
+- `COUNTY_RUCC_2013` - Urban/rural classification
+- `log_prev_week_inc_rate`, `log_prev_week_mort_rate` - Logged pandemic severity (lagged)
+- `binary_concern`, `binary_concern_strong` - Perceived severity indicators
+
+## Model Specification Strategy
+
+Scripts 03–05 use **progressive nested models** to show partisan gaps persist across all specifications:
+- **Model 1**: Base (party + wave FEs)
+- **Model 2**: + Demographic controls (age, race, gender, education, employment, household size)
+- **Model 3**: + Contextual controls (local incidence/mortality, CD partisanship)
+
+This structure directly tests Theories 1–5 above: if gaps disappear in later models, the theory is supported; if they persist, partisan identity overrides those explanations.
 
 ## Common Commands
 
 ```r
-# Render paper
-quarto render paper/partisan_differences.qmd
+# Run data prep
+rmarkdown::render("code/00-Prep_BICS_Data.Rmd")
 
 # Export paper statistics
 source("code/export_paper_statistics.R")
 
-# Run data prep
-rmarkdown::render("code/00-Prep_BICS_Data.Rmd")
+# Render main paper
+quarto render paper/partisan_differences.qmd
+
+# Render JHSB submission (paths use ../../out/tables/ from that subdirectory)
+quarto render paper/jhsb_submission/partisan_differences.qmd --to pdf
 ```
+
+## JHSB Submission Notes
+
+See `paper/jhsb_submission/CLAUDE.md` for full formatting requirements. Key differences from main paper:
+- ASA citation style (not APA); uses `american-sociological-association.csl`
+- No heading on Introduction; "Methods" → "Data and Methods"
+- Footnotes converted to a "NOTES" section (not inline)
+- Abstract < 150 words; title page anonymized; ≤ 10,000 words total
+- Paths to output files use `../../out/tables/` (one level deeper than main paper)

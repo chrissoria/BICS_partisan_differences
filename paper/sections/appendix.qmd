@@ -917,6 +917,9 @@ gaps_long <- bind_rows(contacts_sig, masks_sig, concern_sig) %>%
 
 ggplot(gaps_long, aes(x = wave_label, y = gap_rep_dem, fill = significant)) +
   geom_col(alpha = 0.85, width = 0.6, color = "black") +
+  geom_errorbar(aes(ymin = gap_rep_dem - 1.96 * se_gap,
+                    ymax = gap_rep_dem + 1.96 * se_gap),
+                width = 0.2, color = "black", linewidth = 0.7) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_text(aes(label = sprintf("%.1f", gap_rep_dem),
                 y = gap_rep_dem / 2),

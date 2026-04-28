@@ -148,9 +148,9 @@ First, we establish partisan differences in health behaviors and test whether th
 Second, we examine whether risk perception and objective pandemic severity can account for the gaps.
 Third, we test whether gaps persist across geographic, policy, and partisan contexts, the central test of "portable polarization."
 
-Our empirical strategy is organized around the competing explanations outlined in the Background.
-Each explanation predicts that partisan gaps should narrow or disappear under specific conditions; we test each by examining whether gaps persist where that explanation predicts they should not.
-This pattern-based approach allows us to constrain the set of plausible explanations even though we cannot directly identify causal mechanisms with observational data.
+Our empirical strategy examines whether partisan identity remains a statistically significant predictor of health behaviors after accounting for the alternative explanations outlined in the Background.
+Each alternative suggests conditions under which the partisan association should weaken; we assess whether partisan identity retains predictive power within those conditions.
+This approach allows us to evaluate how robust the partisan–health association is across different statistical controls and contextual comparisons, while recognizing that observational data cannot establish causal mechanisms.
 
 To examine whether partisans differentially respond to changes in pandemic severity, we estimate models interacting party identification with lagged local conditions:
 
@@ -164,7 +164,7 @@ Both predictors are standardized (z-score) to facilitate comparison.
 In supplementary analyses, we substitute county fixed effects ($\gamma_c$) to isolate within-county temporal variation from all time-invariant county characteristics (see @sec-interaction-models).
 
 For the first research question, we estimate weighted means and regression-adjusted comparisons of health behaviors by party, controlling for demographics.
-We then stratify by concern level to test the perception explanation: if partisan gaps disappear among respondents reporting the same level of concern, the perception account is sufficient; if gaps persist, identity may operate through channels beyond stated risk perception.
+We then stratify by concern level to assess the perception explanation: if partisan gaps disappear among respondents reporting the same level of concern, perception fully accounts for the behavioral differences; if gaps persist, partisan identity remains a significant predictor beyond stated risk perception.
 
 For the second research question, the wave fixed effects specification above tests whether partisan gaps narrow when objective severity rises, using within-wave cross-county variation in local conditions.
 Supplementary county fixed effects models absorb all time-invariant county characteristics, isolating within-county temporal variation to ask: as conditions change within the same county, do partisans adjust their behavior differently?
