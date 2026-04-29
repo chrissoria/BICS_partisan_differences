@@ -9,6 +9,11 @@ editor:
     wrap: sentence
 ---
 
+Christopher Soria^1^, Audrey Dorelien^2^, Ayesha Mahmud^1^, Dennis Feehan^1^
+
+^1^Department of Demography, University of California, Berkeley
+^2^Department of Sociology, University of Washington
+
 ```{r}
 #| label: setup
 #| include: false
