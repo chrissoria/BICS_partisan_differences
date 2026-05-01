@@ -9,7 +9,7 @@ editor:
     wrap: sentence
 ---
 
-Christopher Soria^1^, Audrey Dorelien^2^, Ayesha Mahmud^1^, Dennis Feehan^1^
+Christopher Soria^1^, Audrey M. Dorélien^2^, Ayesha Mahmud^1^, Dennis Feehan^1^
 
 ^1^Department of Demography, University of California, Berkeley
 ^2^Department of Sociology, University of Washington
@@ -56,36 +56,121 @@ contact_gap_min <- min(reg_gaps$contacts_gap_rd)
 contact_gap_max <- max(reg_gaps$contacts_gap_rd)
 mask_gap_min    <- min(reg_gaps$mask_gap_dr)
 mask_gap_max    <- max(reg_gaps$mask_gap_dr)
+
+# Load fully-adjusted partisan gaps (Republican vs Democrat, Model 3)
+adj_party_gaps <- read_csv("../../out/tables/adjusted_partisan_gaps.csv",
+                            show_col_types = FALSE)
+contact_adj_coef <- adj_party_gaps |> filter(outcome == "contacts_total") |> pull(estimate)
+contact_adj_se   <- adj_party_gaps |> filter(outcome == "contacts_total") |> pull(std_error)
+mask_adj_coef    <- adj_party_gaps |> filter(outcome == "mask_usage") |> pull(estimate)
+mask_adj_se      <- adj_party_gaps |> filter(outcome == "mask_usage") |> pull(std_error)
+
+# Load wave-level gaps with mortality context (for Figure 4)
+gaps_by_wave <- read_csv("../../out/tables/gaps_by_wave.csv",
+                         show_col_types = FALSE) |>
+  mutate(
+    wave_label = case_when(
+      wave == 1 ~ "Apr '20",
+      wave == 2 ~ "Jun '20",
+      wave == 3 ~ "Sep '20",
+      wave == 4 ~ "Dec '20",
+      wave == 5 ~ "Feb '21",
+      wave == 6 ~ "May '21"
+    ),
+    wave_label = factor(wave_label,
+                        levels = c("Apr '20", "Jun '20", "Sep '20",
+                                   "Dec '20", "Feb '21", "May '21"))
+  )
 ```
+
+**Keywords:** Political polarization; Partisan identity; COVID-19; Health behavior; Social contact patterns
+
+**Status and ethics:** This manuscript reports original research and is being prepared for submission; it has not been published or submitted elsewhere. The study uses survey data originally collected by the authors during the COVID-19 pandemic; as a secondary analysis of de-identified data, this work does not require additional Institutional Review Board review.
 
 ## Abstract
 
-### Introduction
+Health behaviors during the COVID-19 pandemic differed by political party affiliation [@gadarian_partisanship_2021; @allcott_polarization_2020; @clinton_partisan_2021].
+Building on prior work showing these partisan gaps can alter modeled epidemic dynamics [@soria_2026], we examine how the polarization persists across contexts and over time, and whether mask and contact gaps follow different patterns.
+Using six cross-sectional waves of the Berkeley Interpersonal Contact Study (BICS), we test whether they reduce to mask-mandate policy, demographic composition, geographic context, or perceived severity — distinctions that matter for transmission modeling and for understanding when health issues lock into partisan polarization more broadly.
 
-That COVID-19 health behaviors became politically polarized is well established [@gadarian_partisanship_2021; @allcott_polarization_2020; @clinton_partisan_2021].
-Less clear is whether these differences persist after accounting for factors that covary with partisanship, such as differences in mask-mandate policy, geographic, and/or pandemic severity contexts and perceptions of them.
-This distinction has direct, quantifiable implications for disease spread: behavioral gaps that are independent of these factors represent a source of heterogeneity that may warrant incorporation into transmission modeling.
-We use individual-level behavioral data from the Berkeley Interpersonal Contact Study (BICS) to adjudicate between these competing explanations.
+BICS — one of the few US nationally representative datasets combining detailed face-to-face contact diaries with individual partisan identity — spans April 2020 to May 2021 (N = `r format(n_total, big.mark = ",")`), recording daily face-to-face contacts and mask usage.
+We linked individual survey responses to county-level COVID-19 incidence and mortality rates, congressional district partisan composition, and county mask mandate status.
+We used progressively nested regression models with subgroup analyses.
 
-### Methods
+Across all six waves, Republicans reported substantially more daily contacts and lower rates of mask usage and vaccine acceptance than Democrats.
 
-BICS is a nationally representative survey conducted across six waves from April 2020 to May 2021 (N = `r format(n_total, big.mark = ",")`) that includes detailed counts of daily face-to-face contacts and mask usage during specific interactions.
-Individual survey responses are linked to county-level COVID-19 incidence and mortality rates, congressional district partisan composition, and county mask mandate status.
-Survey weights are raked on party identification to match national Gallup targets.
-We use regression models to examine whether partisan associations persist within shared policy environments, geographic regions, levels of stated concern, and local partisan compositions.
+These gaps did not move in tandem with pandemic severity. The mask gap widened across the study period (from `r sprintf("%.1f", w1_mask_gap)` to `r sprintf("%.1f", w6_mask_gap)` percentage points, with a brief narrowing in September 2020), and Republicans reported their lowest concern about COVID at the winter 2020–21 mortality peak. The contact gap, in contrast, narrowed substantially during that same surge, shrinking to `r sprintf("%.1f", w5_contact_gap)` contacts/day in February 2021.
 
-### Results
+The mask gap was largely insensitive to political and policy context. Republicans in Democrat-majority districts wore masks at higher rates than co-partisans in Republican-majority areas, but Democrats shifted upward in those contexts as well, and the partisan gap persisted within every mask-mandate regime, leaving polarization intact across both political and policy environments.
 
-Republicans reported more daily contacts than Democrats across all six waves (adjusted wave-pooled gap: `r sprintf("%.1f", contacts_gap)` contacts/day), had substantially lower vaccine acceptance in Wave 6 (`r sprintf("%.1f", vax_rep)`% vs. `r sprintf("%.1f", vax_dem)`%), and wore masks at consistently lower rates.
-While the contact gap narrowed substantially during the winter 2020–21 mortality surge — falling to `r sprintf("%.1f", w5_contact_gap)` contacts/day in February 2021 — the partisan gap in mask usage widened monotonically from `r sprintf("%.1f", w1_mask_gap)` to `r sprintf("%.1f", w6_mask_gap)` percentage points, showing no compression during mortality peaks.
-At its widest, the mask gap exceeded cross-group differences by race, gender, or education.
-Mask usage was also the most context-sensitive behavior: Republicans in Democrat-majority districts wore masks at higher rates than their co-partisans in Republican-majority areas, yet Democrats shifted upward in Democrat-majority contexts as well, leaving the partisan gap intact.
+The partisan contact gap diminished sharply in some subgroups (approaching zero among non-metropolitan and non-White respondents), while a partisan mask gap was present in every subgroup we examined. Despite this heterogeneity, partisan identity remained a statistically significant predictor in fully adjusted models: relative to Democrats, Republicans reported `r sprintf("%.2f", contact_adj_coef)` more contacts per day (SE = `r sprintf("%.2f", contact_adj_se)`, p < .001) and `r sprintf("%.2f", abs(mask_adj_coef))` percentage points lower mask usage (SE = `r sprintf("%.2f", mask_adj_se)`, p < .001).
 
-![Absolute unadjusted differences in daily contacts (A), mask usage (B), and vaccine acceptance (C) by group. The partisan gap (red) is shown alongside gaps by age, urbanicity, race/ethnicity, education, and gender. Bars are ordered from largest to smallest gap within each panel. Error bars = ±1 SE.](../../out/plots/contrast_contacts_masks.png){width="100%"}
+```{r}
+#| label: fig-partisan-gaps
+#| fig-cap: "Partisan Gaps in Health Behaviors Across Survey Waves. Lines show the Republican–Democrat difference in daily contacts (Panel A) and the Democrat–Republican difference in mask usage (Panel B). Gray bars show local mortality rates (deaths per 100,000) during each wave."
+#| fig-height: 5
+#| fig-width: 10
+#| echo: false
+#| warning: false
+#| message: false
 
-### Discussion
+library(patchwork)
+library(cowplot)
 
-These patterns are consistent with theoretical accounts in which partisan identity structures health behavior independent of policy, place, and demography.
-The temporal trajectories are telling: contact gaps were smallest at peak mortality, while the mask gap widened monotonically regardless of local conditions, consistent with masking functioning as a publicly legible group marker subject to identity costs [@goffman_stigma_1963].
-During the winter 2020--21 surge, Republicans reported their lowest concern levels yet reduced contacts substantially, while the mask gap continued to widen, consistent with expressive responding shaping stated concern [@clinton_partisan_2021].
-That these gaps rival those by race, gender, and education and persist across policy environments, geographic contexts, and demographic controls points to partisan identity as a robust correlate of COVID-19 health behavior with implications for health inequality and partisan polarization.
+max_mort <- max(gaps_by_wave$mean_mort_rate)
+max_contact_gap <- max(gaps_by_wave$contacts_gap)
+max_mask_gap <- max(gaps_by_wave$mask_gap)
+
+contact_scale <- max_contact_gap / max_mort * 1.3
+mask_scale    <- max_mask_gap / max_mort * 1.3
+
+p_contact_gap <- ggplot(gaps_by_wave, aes(x = wave_label)) +
+  geom_col(aes(y = mean_mort_rate * contact_scale),
+           fill = "gray70", alpha = 0.5, width = 0.7) +
+  geom_line(aes(y = contacts_gap, group = 1), color = "#7570b3", linewidth = 1.2) +
+  geom_point(aes(y = contacts_gap), color = "#7570b3", size = 4) +
+  geom_text(aes(y = contacts_gap, label = sprintf("%.1f", contacts_gap)),
+            vjust = -1.2, size = 4, fontface = "bold") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_y_continuous(
+    name = "R-D Gap (contacts/day)",
+    sec.axis = sec_axis(~ . / contact_scale, name = "Mortality (per 100k)"),
+    expand = expansion(mult = c(0.05, 0.2))
+  ) +
+  labs(x = NULL, title = "A. Contact Gap (Republican - Democrat)") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 15),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y.right = element_text(color = "gray50")
+  )
+
+p_mask_gap <- ggplot(gaps_by_wave, aes(x = wave_label)) +
+  geom_col(aes(y = mean_mort_rate * mask_scale),
+           fill = "gray70", alpha = 0.5, width = 0.7) +
+  geom_line(aes(y = mask_gap, group = 1), color = "#1b9e77", linewidth = 1.2) +
+  geom_point(aes(y = mask_gap), color = "#1b9e77", size = 4) +
+  geom_text(aes(y = mask_gap, label = sprintf("%.1f", mask_gap)),
+            vjust = -1.2, size = 4, fontface = "bold") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_y_continuous(
+    name = "D-R Gap (percentage points)",
+    sec.axis = sec_axis(~ . / mask_scale, name = "Mortality (per 100k)"),
+    expand = expansion(mult = c(0.05, 0.2))
+  ) +
+  labs(x = NULL, title = "B. Mask Gap (Democrat - Republican)") +
+  theme_cowplot() +
+  theme(
+    plot.title = element_text(face = "bold", size = 15),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y.right = element_text(color = "gray50")
+  )
+
+p_contact_gap + p_mask_gap +
+  plot_annotation(caption = "Note: Gray background bars show local mortality rates during each survey wave (right axis).")
+```
+
+These patterns extend prior work showing that partisan identity structures publicly observable health behaviors more strongly than less-visible ones [@baxter-king_how_2022].
+Contact gaps were smallest at peak mortality, while the mask gap widened despite fluctuations in conditions, consistent with masking as a publicly legible group marker subject to identity costs [@goffman_stigma_1963].
+Republicans' lowest concern coincided with peak mortality, consistent with expressive responding shaping stated concern [@clinton_partisan_2021].
+These gaps rival those by race, gender, and education and persist — particularly for masks — across policy and contextual controls, pointing to partisan identity as a robust correlate of expressive, more than instrumental, COVID-19 health behaviors, with implications for health inequality, partisan polarization, and the broader question of which health behaviors become locked into political identity in polarized contexts.

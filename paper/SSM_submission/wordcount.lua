@@ -1,5 +1,5 @@
 -- wordcount.lua
--- Counts words in the document body and appends a word count line.
+-- Counts words in the document body, excluding figure captions.
 local words = 0
 
 local function count(el)
@@ -16,13 +16,15 @@ local wordcount_walker = {
 }
 
 function Pandoc(el)
-  -- walk all blocks
+  -- walk top-level blocks, skipping Figure blocks so captions don't count
   for _, block in ipairs(el.blocks) do
-    pandoc.walk_block(block, wordcount_walker)
+    if block.t ~= "Figure" then
+      pandoc.walk_block(block, wordcount_walker)
+    end
   end
   -- append word count paragraph at the end
   local note = pandoc.Para({
-    pandoc.Strong({pandoc.Str("Word count: " .. words)})
+    pandoc.Strong({pandoc.Str("Word count (excl. figure caption): " .. words)})
   })
   table.insert(el.blocks, note)
   return el
